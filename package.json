@@ -2,7 +2,7 @@
   "name": "ogorodbot",
   "private": true,
   "version": "0.0.0",
-  "homepage": "https://gorant1991.github.io/ogorodbot",
+  "homepage": "https://ogorod-ai.ru",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -26,6 +26,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/suncalc": "^1.9.2",
+    "@vitejs/plugin-legacy": "^8.0.0",
     "@vitejs/plugin-react": "^6.0.0",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",

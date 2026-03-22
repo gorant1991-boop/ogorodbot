@@ -1,13 +1,53 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ogorodbot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="ОгородБот — советы агронома, план работ, лунный календарь, прогноз погоды и дневник огородника." />
+    <title>ОгородБот</title>
   </head>
   <body>
+    <div id="startup-status" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:#0a1a0d;color:#fff;font-family:Nunito,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;z-index:9999;">
+      <div style="width:min(100%,420px);text-align:center;">
+        <div style="font-size:40px;line-height:1;margin-bottom:14px;">🌱</div>
+        <div style="font-size:18px;font-weight:800;margin-bottom:8px;">ОгородБот загружается</div>
+        <div id="startup-status-text" style="font-size:14px;line-height:1.5;color:rgba(255,255,255,.72);">Подготавливаем приложение...</div>
+      </div>
+    </div>
     <div id="root"></div>
+    <script>
+      (function () {
+        var statusEl = document.getElementById('startup-status');
+        var textEl = document.getElementById('startup-status-text');
+        var mounted = false;
+
+        window.__ogorodbotMounted = function () {
+          mounted = true;
+          if (statusEl) {
+            statusEl.style.display = 'none';
+          }
+        };
+
+        window.addEventListener('error', function (event) {
+          if (!textEl || mounted) return;
+          textEl.textContent = 'Ошибка запуска: ' + (event && event.message ? event.message : 'неизвестная ошибка');
+        });
+
+        window.addEventListener('unhandledrejection', function (event) {
+          if (!textEl || mounted) return;
+          var reason = event && event.reason;
+          textEl.textContent = 'Ошибка запуска: ' + (reason && reason.message ? reason.message : String(reason || 'неизвестная ошибка'));
+        });
+
+        window.setTimeout(function () {
+          if (!textEl || mounted) return;
+          textEl.textContent = 'Загрузка идёт слишком долго. Проверьте интернет и обновите страницу.';
+        }, 8000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

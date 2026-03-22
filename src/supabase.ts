@@ -29,7 +29,7 @@ export async function loadLastNotification(vkUserId: number) {
     .eq('vk_user_id', vkUserId)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
   if (error) return null
   return data
 }
@@ -79,7 +79,7 @@ export async function loadSubscriptionNotif(vkUserId: number) {
     .eq('type', 'subscription')
     .order('created_at', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
   if (error) return null
   return data
 }

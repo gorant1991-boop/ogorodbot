@@ -1,10 +1,52 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { 
+  box-sizing: border-box; 
+  margin: 0; 
+  padding: 0;
+  max-width: 100%;
+  min-width: 0;
+}
 
-body { font-family: 'Nunito', sans-serif; background: #0a1a0d; color: #fff; min-height: 100dvh; }
-#root { min-height: 100dvh; }
-.screen { min-height: 100dvh; display: flex; flex-direction: column; position: relative; }
+body { 
+  font-family: 'Nunito', sans-serif; 
+  background: #0a1a0d; 
+  background-color: #0a1a0d;
+  color: #fff; 
+  min-height: 100dvh;
+  width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  background: #0a1a0d;
+  background-color: #0a1a0d;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+#root { 
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  background: #0a1a0d;
+  background-color: #0a1a0d;
+}
+
+.screen { 
+  min-height: 100dvh; 
+  display: flex; 
+  flex-direction: column; 
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+}
 
 /* ── ОНБОРДИНГ ──────────────────────────────────────────────────── */
 .onboarding { background: linear-gradient(160deg, #0d3320 0%, #1a5c35 50%, #0f2d18 100%); }
@@ -141,8 +183,8 @@ body { font-family: 'Nunito', sans-serif; background: #0a1a0d; color: #fff; min-
 .ob-city-hint { font-size: 12px; color: rgba(255,255,255,.35); margin-bottom: 16px; align-self: flex-start; }
 
 /* ── МОДАЛКА ────────────────────────────────────────────────────── */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 100; display: flex; align-items: flex-end; }
-.modal-sheet { background: #122a1a; border-radius: 24px 24px 0 0; padding: 16px 20px 32px; width: 100%; max-height: 88vh; overflow-y: auto; -webkit-overflow-scrolling: touch; max-width: 480px; margin: 0 auto; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 1200; display: flex; align-items: flex-end; }
+.modal-sheet { background: #122a1a; border-radius: 24px 24px 0 0; padding: 16px 20px max(32px, calc(32px + env(safe-area-inset-bottom))); width: 100%; max-height: min(88vh, calc(100dvh - 12px)); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; max-width: 480px; margin: 0 auto; }
 .modal-handle { width: 40px; height: 4px; background: rgba(255,255,255,.2); border-radius: 2px; margin: 0 auto 16px; }
 .modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
 .modal-icon { font-size: 28px; }
@@ -176,7 +218,7 @@ body { font-family: 'Nunito', sans-serif; background: #0a1a0d; color: #fff; min-
 .greeting { font-size: 12px; color: rgba(255,255,255,.4); font-weight: 600; }
 .date { font-size: 18px; font-weight: 800; color: #fff; text-transform: capitalize; }
 .lunar-badge { background: rgba(168,85,247,.15); border: 1px solid rgba(168,85,247,.3); border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 700; color: #c084fc; white-space: nowrap; }
-.tab-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
+.tab-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: max(80px, calc(80px + env(safe-area-inset-bottom))); }
 .tab-content { padding-bottom: 8px; }
 
 /* ── СОВЕТ ДНЯ ──────────────────────────────────────────────────── */
@@ -291,7 +333,7 @@ body { font-family: 'Nunito', sans-serif; background: #0a1a0d; color: #fff; min-
 .notif-channel-btn.active { background: rgba(74,222,128,.12); border-color: rgba(74,222,128,.4); }
 .notif-channel-btn:active { opacity: .8; }
 .notif-ch-icon { font-size: 20px; flex-shrink: 0; }
-.notif-ch-label { font-size: 13px; font-weight: 700; color: #fff; flex: 1; text-align: left; }
+.notif-ch-label { font-size: 13px; font-weight: 700; color: #fff; flex: 1; text-align: left; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .notif-ch-check { font-size: 14px; color: #4ade80; font-weight: 800; flex-shrink: 0; }
 
 /* ── ТАРИФЫ В ПРОФИЛЕ ───────────────────────────────────────────── */
@@ -304,14 +346,33 @@ body { font-family: 'Nunito', sans-serif; background: #0a1a0d; color: #fff; min-
 .sub-active-badge { margin-left: auto; background: rgba(74,222,128,.2); border: 1px solid rgba(74,222,128,.4); border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; color: #4ade80; }
 .btn-upgrade-full { width: 100%; margin-top: 12px; background: linear-gradient(135deg, #4ade80, #16a34a); border: none; border-radius: 12px; padding: 11px; font-size: 14px; font-weight: 800; color: #fff; cursor: pointer; font-family: 'Nunito', sans-serif; }
 .btn-upgrade-full:active { opacity: .85; }
+.subscription-status-card { background: linear-gradient(135deg, rgba(74,222,128,.14), rgba(255,255,255,.05)); border: 1px solid rgba(74,222,128,.22); border-radius: 16px; padding: 14px; }
+.subscription-status-top { display: flex; align-items: flex-start; gap: 12px; }
+.subscription-status-label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: rgba(255,255,255,.45); font-weight: 700; }
+.subscription-status-title { font-size: 16px; color: #fff; font-weight: 800; margin-top: 2px; }
+.subscription-status-meta { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 8px; line-height: 1.45; }
+.subscription-offer-sub { font-size: 12px; color: rgba(255,255,255,.5); margin-bottom: 10px; }
+.subscription-offer-savings { margin-bottom: 10px; font-size: 12px; color: #fcd34d; font-weight: 700; }
 
 /* ── ТАББАР ─────────────────────────────────────────────────────── */
-.navbar { display: flex; justify-content: space-around; padding: 10px 0 16px; border-top: 1px solid rgba(255,255,255,.08); background: rgba(10,26,13,.95); flex-shrink: 0; }
-.nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; background: none; border: none; font-family: 'Nunito', sans-serif; padding: 4px 16px; }
+.navbar { 
+  display: flex; 
+  justify-content: space-around; 
+  position: fixed; 
+  bottom: 0; 
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, 480px);
+  padding: 10px 0 max(16px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255,255,255,.08); 
+  background: rgba(10,26,13,.98);
+  flex-shrink: 0;
+  z-index: 999;
+  box-shadow: 0 -2px 8px rgba(0,0,0,.3);
+}
+.nav-item { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; background: none; border: none; font-family: 'Nunito', sans-serif; padding: 4px 10px; }
 .nav-icon { font-size: 20px; line-height: 1; }
-.nav-icon-img { width: 28px; height: 28px; object-fit: contain; border-radius: 6px; opacity: 0.7; transition: opacity .2s; }
-.nav-item.active .nav-icon-img { opacity: 1; }
-.nav-label { font-size: 9px; color: rgba(255,255,255,.35); font-weight: 700; }
+.nav-label { font-size: 9px; color: rgba(255,255,255,.35); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .nav-item.active .nav-label { color: #4ade80; }
 
 /* ── ЧАТ ────────────────────────────────────────────────────────── */
@@ -340,7 +401,8 @@ body { font-family: 'Nunito', sans-serif; background: #0a1a0d; color: #fff; min-
   .crops-dashboard { grid-template-columns: repeat(4, 1fr); }
   .main, .chat { max-width: 600px; }
   .modal-sheet { max-width: 600px; }
-  .notif-channels-grid { grid-template-columns: repeat(4, 1fr); }
+  .notif-channels-grid { grid-template-columns: repeat(2, 1fr); }
+  .navbar { width: min(100%, 600px); }
 }
 
 /* ── FAQ ────────────────────────────────────────────────────────── */
@@ -428,6 +490,14 @@ body { font-family: 'Nunito', sans-serif; background: #0a1a0d; color: #fff; min-
   font-size: 13px;
   font-weight: 600;
   color: #4ade80;
+}
+.diary-variety {
+  font-size: 11px;
+  color: #bbf7d0;
+  background: rgba(74,222,128,0.12);
+  border: 1px solid rgba(74,222,128,0.22);
+  border-radius: 999px;
+  padding: 2px 8px;
 }
 .diary-op {
   font-size: 11px;
