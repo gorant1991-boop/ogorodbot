@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import legacy from '@vitejs/plugin-legacy'
+import { rmSync } from 'node:fs'
 
 export default defineConfig({
   plugins: [
@@ -10,6 +11,12 @@ export default defineConfig({
       modernPolyfills: true,
       renderLegacyChunks: true,
     }),
+    {
+      name: 'remove-icons-from-dist',
+      closeBundle() {
+        rmSync('dist/icons', { recursive: true, force: true })
+      },
+    },
   ],
   base: '/',
   build: {
