@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="ru">
   <head>
+    <script type="module" crossorigin src="/assets/polyfills-B5WOtfwr.js"></script>
+
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
@@ -8,9 +10,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="ОгородБот — советы агронома, план работ, лунный календарь, прогноз погоды и дневник огородника." />
     <title>ОгородБот</title>
-    <script type="module" crossorigin src="/assets/index-DgBIqfdu.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/dist-BA0XZ08w.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-ykiwYtIF.css">
+    <script type="module" crossorigin src="/assets/index-CJ_E_48j.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/chunk-B3K2TuZy.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-C4wkgmki.css">
+    <script type="module">import'data:text/javascript,if(!import.meta.resolve)throw Error("import.meta.resolve not supported")';import.meta.url;import("_").catch(()=>1);(async function*(){})().next();window.__vite_is_modern_browser=true</script>
+    <script type="module">!function(){if(window.__vite_is_modern_browser)return;console.warn("vite: loading legacy chunks, syntax error above and the same error below should be ignored");var e=document.getElementById("vite-legacy-polyfill"),n=document.createElement("script");n.src=e.src,n.onload=function(){System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))},document.body.appendChild(n)}();</script>
   </head>
   <body>
     <div id="startup-status" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:#0a1a0d;color:#fff;font-family:Nunito,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;z-index:9999;">
@@ -26,11 +30,6 @@
         var statusEl = document.getElementById('startup-status');
         var textEl = document.getElementById('startup-status-text');
         var mounted = false;
-
-        window.__ogorodbotSetStartupStatus = function (text) {
-          if (!textEl || mounted) return;
-          textEl.textContent = text;
-        };
 
         window.__ogorodbotMounted = function () {
           mounted = true;
@@ -52,17 +51,12 @@
 
         window.setTimeout(function () {
           if (!textEl || mounted) return;
-          textEl.textContent = '⏳ JS ещё не запустился (3 сек)';
-        }, 3000);
-        window.setTimeout(function () {
-          if (!textEl || mounted) return;
-          textEl.textContent = '⏳ JS ещё не запустился (8 сек)';
-        }, 8000);
-        window.setTimeout(function () {
-          if (!textEl || mounted) return;
           textEl.textContent = 'Загрузка идёт слишком долго. Проверьте интернет и обновите страницу.';
-        }, 15000);
+        }, 8000);
       })();
     </script>
+    <script nomodule>!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script>
+    <script nomodule crossorigin id="vite-legacy-polyfill" src="/assets/polyfills-legacy-6ZPkocpp.js"></script>
+    <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-D3TNmqMu.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
   </body>
 </html>
