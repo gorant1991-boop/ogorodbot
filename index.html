@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="ОгородБот — советы агронома, план работ, лунный календарь, прогноз погоды и дневник огородника." />
     <title>ОгородБот</title>
-    <script type="module" crossorigin src="/assets/index-DP_nXM-G.js"></script>
+    <script type="module" crossorigin src="/assets/index-DgBIqfdu.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/dist-BA0XZ08w.js">
     <link rel="stylesheet" crossorigin href="/assets/index-ykiwYtIF.css">
   </head>
@@ -26,6 +26,11 @@
         var statusEl = document.getElementById('startup-status');
         var textEl = document.getElementById('startup-status-text');
         var mounted = false;
+
+        window.__ogorodbotSetStartupStatus = function (text) {
+          if (!textEl || mounted) return;
+          textEl.textContent = text;
+        };
 
         window.__ogorodbotMounted = function () {
           mounted = true;
