@@ -29,9 +29,29 @@
         var statusEl = document.getElementById('startup-status');
         var textEl = document.getElementById('startup-status-text');
         var mounted = false;
+        var reloadKey = 'ogorodbot_startup_reload_once';
+
+        function scheduleStartupReload(message) {
+          try {
+            if (sessionStorage.getItem(reloadKey) === '1') return false;
+            sessionStorage.setItem(reloadKey, '1');
+            if (textEl) {
+              textEl.textContent = 'Не удалось загрузить приложение. Пробую обновить страницу...';
+            }
+            window.setTimeout(function () {
+              window.location.reload();
+            }, 900);
+            return true;
+          } catch (_) {
+            return false;
+          }
+        }
 
         window.__ogorodbotMounted = function () {
           mounted = true;
+          try {
+            sessionStorage.removeItem(reloadKey);
+          } catch (_) {}
           if (statusEl) {
             statusEl.style.display = 'none';
           }
@@ -39,13 +59,21 @@
 
         window.addEventListener('error', function (event) {
           if (!textEl || mounted) return;
-          textEl.textContent = 'Ошибка запуска: ' + (event && event.message ? event.message : 'неизвестная ошибка');
+          var message = event && event.message ? event.message : 'неизвестная ошибка';
+          if (/load failed|failed to fetch|importing a module script failed|the network connection was lost/i.test(message)) {
+            if (scheduleStartupReload(message)) return;
+          }
+          textEl.textContent = 'Ошибка запуска: ' + message;
         });
 
         window.addEventListener('unhandledrejection', function (event) {
           if (!textEl || mounted) return;
           var reason = event && event.reason;
-          textEl.textContent = 'Ошибка запуска: ' + (reason && reason.message ? reason.message : String(reason || 'неизвестная ошибка'));
+          var message = reason && reason.message ? reason.message : String(reason || 'неизвестная ошибка');
+          if (/load failed|failed to fetch|importing a module script failed|the network connection was lost/i.test(message)) {
+            if (scheduleStartupReload(message)) return;
+          }
+          textEl.textContent = 'Ошибка запуска: ' + message;
         });
 
         window.setTimeout(function () {
