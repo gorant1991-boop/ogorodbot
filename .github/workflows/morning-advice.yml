@@ -13,12 +13,14 @@ jobs:
         env:
           MORNING_ADVICE_URL: ${{ secrets.MORNING_ADVICE_URL }}
         run: |
-          if [ -z "$MORNING_ADVICE_URL" ]; then
+          CLEAN_URL="$(printf '%s' "$MORNING_ADVICE_URL" | tr -d '\r\n' | sed 's/^"//; s/"$//')"
+
+          if [ -z "$CLEAN_URL" ]; then
             echo "Missing MORNING_ADVICE_URL secret"
             exit 1
           fi
 
           curl --fail --show-error --silent \
-            -X POST "$MORNING_ADVICE_URL" \
+            -X POST "$CLEAN_URL" \
             -H "Content-Type: application/json" \
             -d '{}'
