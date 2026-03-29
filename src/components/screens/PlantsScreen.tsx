@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { OnboardingData, CropEntry, CropVariety, Plan } from '../../utils/types'
+import type { OnboardingData, CropEntry, CropVariety, FertilizerItem, Plan } from '../../utils/types'
 import { CROPS, CROP_CATEGORIES, CROP_DAYS, PLAN_LIMITS, GROW_OPTIONS, SOIL_LABELS, buildDiaryText, getFirstOp, getOps, getWeatherRisks, daysSince, getCropStage, isPerennial } from '../../utils/constants'
 import { useWeather } from '../../hooks'
 import { CropEditModal, CropVarietyPickerModal } from '../../components/modals'
@@ -7,7 +7,7 @@ import { CompatScreen } from './CompatScreen'
 import { DiseaseScreen } from './DiseaseScreen'
 import { addDiaryEntry } from '../../supabase'
 
-export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEntry, vkUserId, onAskAi }: {
+export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEntry, vkUserId, onAskAi, onUpdateData }: {
   data: OnboardingData
   plan: Plan
   onUpdateEntry: (id: string, patch: Partial<CropEntry>) => void
@@ -15,6 +15,7 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
   onDeleteEntry: (id: string) => void
   vkUserId: number
   onAskAi: (question: string) => void
+  onUpdateData: (patch: Partial<OnboardingData>) => void
 }) {
   const [editEntry, setEditEntry] = useState<CropEntry | null>(null)
   const [showDiaryAdd, setShowDiaryAdd] = useState(false)
@@ -27,8 +28,26 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
   const [pickerCropId, setPickerCropId] = useState<string | null>(null)
   const [activeCat, setActiveCat] = useState(0)
   const weather = useWeather(data.city)
-  const [plantsTab, setPlantsTab] = useState<'plants' | 'compat' | 'disease'>('plants')
-  const risks = weather.loading || weather.error ? [] : getWeatherRisks(weather.temp, weather.humidity, data.cropEntries)
+  const [plantsTab, setPlantsTab] = useState<'plants' | 'fertilizers' | 'compat' | 'disease'>('plants')
+  const [fertilizerDraft, setFertilizerDraft] = useState<FertilizerItem>({ id: '', name: '', brand: '', composition: '', note: '' })
+  const [editingFertilizerId, setEditingFertilizerId] = useState<string | null>(null)
+  const risks = weather.loading || weather.error ? [] : getWeatherRisks(weather.temp, weather.humidity, data.cropEntries, data.gardenObjects)
+
+  function getVarietySummary(entry: CropEntry) {
+    const namedVarieties = entry.varieties.filter(v => v.name.trim())
+    if (namedVarieties.length === 0) return ''
+    if (namedVarieties.length === 1) return namedVarieties[0].name.trim()
+
+    const preview = namedVarieties.slice(0, 2).map(v => v.name.trim()).join(', ')
+    const extra = namedVarieties.length - 2
+    return extra > 0 ? `${preview} +${extra}` : preview
+  }
+
+  function getVarietyNotes(entry: CropEntry) {
+    return entry.varieties
+      .filter(v => v.name.trim() && v.note?.trim())
+      .map(v => `${v.name.trim()}: ${v.note?.trim()}`)
+  }
 
   const existingIds = data.cropEntries.map(e => e.id)
   const cropLimit = PLAN_LIMITS[plan]
@@ -65,6 +84,45 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
     setDiarySaving(true)
     await addDiaryEntry(vkUserId, diaryCropId || null, diaryOp || null, buildDiaryText(diaryText, diaryVariety))
     closeDiaryAdd()
+  }
+
+  function updateFertilizers(next: FertilizerItem[]) {
+    onUpdateData({ fertilizers: next })
+  }
+
+  function resetFertilizerDraft() {
+    setFertilizerDraft({ id: '', name: '', brand: '', composition: '', note: '' })
+    setEditingFertilizerId(null)
+  }
+
+  function startEditFertilizer(item: FertilizerItem) {
+    setFertilizerDraft(item)
+    setEditingFertilizerId(item.id)
+    setPlantsTab('fertilizers')
+  }
+
+  function saveFertilizer() {
+    if (!fertilizerDraft.name.trim()) return
+    const nextItem = {
+      ...fertilizerDraft,
+      id: fertilizerDraft.id || crypto.randomUUID(),
+      name: fertilizerDraft.name.trim(),
+      brand: fertilizerDraft.brand?.trim() ?? '',
+      composition: fertilizerDraft.composition?.trim() ?? '',
+      note: fertilizerDraft.note?.trim() ?? '',
+    }
+    const existing = Array.isArray(data.fertilizers) ? data.fertilizers : []
+    const next = editingFertilizerId
+      ? existing.map(item => item.id === editingFertilizerId ? nextItem : item)
+      : [...existing, nextItem]
+    updateFertilizers(next)
+    resetFertilizerDraft()
+  }
+
+  function removeFertilizer(id: string) {
+    const existing = Array.isArray(data.fertilizers) ? data.fertilizers : []
+    updateFertilizers(existing.filter(item => item.id !== id))
+    if (editingFertilizerId === id) resetFertilizerDraft()
   }
 
   return (
@@ -214,14 +272,85 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
       )}
 
       {/* Погода */}
-      <div style={{ display: 'flex', gap: 6, padding: '8px 16px 4px', overflowX: 'auto' }}>
-        <button className={`ob-chip ${plantsTab === 'plants' ? 'selected' : ''}`} onClick={() => setPlantsTab('plants')}>🌱 Огород</button>
-        <button className={`ob-chip ${plantsTab === 'compat' ? 'selected' : ''}`} onClick={() => setPlantsTab('compat')}>🤝 Совместимость</button>
-        <button className={`ob-chip ${plantsTab === 'disease' ? 'selected' : ''}`} onClick={() => setPlantsTab('disease')}>⚠️ Болезни</button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6, padding: '8px 16px 4px' }}>
+        <button className={`ob-chip ${plantsTab === 'plants' ? 'selected' : ''}`} style={{ whiteSpace: 'normal', lineHeight: 1.15, minHeight: 40, width: '100%', textAlign: 'center', justifyContent: 'center' }} onClick={() => setPlantsTab('plants')}>🌱 Огород</button>
+        <button className={`ob-chip ${plantsTab === 'fertilizers' ? 'selected' : ''}`} style={{ whiteSpace: 'normal', lineHeight: 1.15, minHeight: 40, width: '100%', textAlign: 'center', justifyContent: 'center' }} onClick={() => setPlantsTab('fertilizers')}>🧴 Удобрения</button>
+        <button className={`ob-chip ${plantsTab === 'compat' ? 'selected' : ''}`} style={{ whiteSpace: 'normal', lineHeight: 1.15, minHeight: 40, width: '100%', textAlign: 'center', justifyContent: 'center' }} onClick={() => setPlantsTab('compat')}>🤝 Совместимость</button>
+        <button className={`ob-chip ${plantsTab === 'disease' ? 'selected' : ''}`} style={{ whiteSpace: 'normal', lineHeight: 1.15, minHeight: 40, width: '100%', textAlign: 'center', justifyContent: 'center' }} onClick={() => setPlantsTab('disease')}>⚠️ Болезни</button>
       </div>
 
       {plantsTab === 'compat' && <CompatScreen cropEntries={data.cropEntries} />}
       {plantsTab === 'disease' && <DiseaseScreen cropEntries={data.cropEntries} city={data.city} />}
+      {plantsTab === 'fertilizers' && (
+        <div style={{ padding: '12px 16px 24px' }}>
+          <div className="section-title">Мои удобрения</div>
+          <div className="weather-card" style={{ padding: 14 }}>
+            <div style={{ display: 'grid', gap: 10 }}>
+              <input
+                className="ob-city-input"
+                style={{ fontSize: 15 }}
+                placeholder="Название удобрения"
+                value={fertilizerDraft.name}
+                onChange={e => setFertilizerDraft(prev => ({ ...prev, name: e.target.value }))}
+              />
+              <input
+                className="ob-city-input"
+                style={{ fontSize: 15 }}
+                placeholder="Фирма"
+                value={fertilizerDraft.brand ?? ''}
+                onChange={e => setFertilizerDraft(prev => ({ ...prev, brand: e.target.value }))}
+              />
+              <input
+                className="ob-city-input"
+                style={{ fontSize: 15 }}
+                placeholder="Состав"
+                value={fertilizerDraft.composition ?? ''}
+                onChange={e => setFertilizerDraft(prev => ({ ...prev, composition: e.target.value }))}
+              />
+              <textarea
+                style={{ width: '100%', minHeight: 72, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, padding: 12, color: '#fff', fontSize: 14, resize: 'vertical', boxSizing: 'border-box' }}
+                placeholder="Пометка: для рассады, для томатов, осторожно по дозировке..."
+                value={fertilizerDraft.note ?? ''}
+                onChange={e => setFertilizerDraft(prev => ({ ...prev, note: e.target.value }))}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn-primary" style={{ flex: 1 }} onClick={saveFertilizer}>
+                  {editingFertilizerId ? 'Сохранить удобрение' : 'Добавить удобрение'}
+                </button>
+                {editingFertilizerId && (
+                  <button className="btn-secondary" style={{ flex: 1 }} onClick={resetFertilizerDraft}>
+                    Отмена
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="section-title" style={{ marginTop: 18 }}>В наличии</div>
+          {(data.fertilizers?.length ?? 0) === 0 ? (
+            <div className="empty-hint">Добавь удобрения, чтобы советы агронома учитывали, что у тебя уже есть под рукой.</div>
+          ) : (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {(data.fertilizers ?? []).map(item => (
+                <div key={item.id} className="weather-card" style={{ padding: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{item.name}</div>
+                      {item.brand && <div style={{ fontSize: 12, color: 'rgba(255,255,255,.6)', marginTop: 4 }}>{item.brand}</div>}
+                      {item.composition && <div style={{ fontSize: 12, color: 'rgba(255,255,255,.75)', marginTop: 6 }}>{item.composition}</div>}
+                      {item.note && <div style={{ fontSize: 12, color: 'rgba(255,255,255,.58)', marginTop: 8 }}>{item.note}</div>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="ob-chip selected" onClick={() => startEditFertilizer(item)}>Изменить</button>
+                      <button className="ob-chip" onClick={() => removeFertilizer(item.id)}>Удалить</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {plantsTab === 'plants' && <div>
       <div className="weather-card">
         {weather.loading ? (
@@ -263,7 +392,10 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
                 <div key={entry.id} className="op-row" onClick={() => setEditEntry(entry)}>
                   <span className="op-icon">{crop.icon}</span>
                   <div className="op-info">
-                    <div className="op-name">{crop.name}{entry.varieties.length > 0 ? ` · ${entry.varieties[0].name}` : ''}</div>
+                    <div className="op-name">
+                      {crop.name}
+                      {entry.varieties.filter(v => v.name.trim()).length > 0 ? ` · ${getVarietySummary(entry)}` : ''}
+                    </div>
                     <div className="op-action">{getFirstOp(entry.id)}</div>
                   </div>
                   <button className="btn-done-sm">✓</button>
@@ -299,19 +431,31 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
                 const stage = perennial ? '🌿 Многолетник' : entry.status === 'planted' ? getCropStage(days, totalDays) : '📋 Планируется'
                 const pct = !perennial && days >= 0 && entry.status === 'planted' ? Math.min(100, (days / totalDays) * 100) : 0
                 const daysLeft = !perennial && entry.status === 'planted' && days >= 0 ? Math.max(0, totalDays - days) : null
+                const namedVarieties = entry.varieties.filter(v => v.name.trim())
+                const varietyNotes = getVarietyNotes(entry)
                 return (
                   <button key={entry.id} className="crop-dash-card" onClick={() => { setShowAddCrop(false); setPickerCropId(null); setEditEntry(entry) }}>
                     <div className="crop-dash-top">
                       <span className="crop-dash-icon">{crop.icon}</span>
                     </div>
                     <div className="crop-dash-name">{crop.name}</div>
-                    {entry.varieties.length > 0 && <div className="crop-dash-variety">{entry.varieties[0].name}</div>}
+                    {namedVarieties.length > 0 && (
+                      <div className="crop-dash-variety">
+                        {namedVarieties.length === 1 ? namedVarieties[0].name : `${namedVarieties.length} сорта: ${getVarietySummary(entry)}`}
+                      </div>
+                    )}
+                    {varietyNotes.length > 0 && (
+                      <div className="crop-dash-variety" style={{ marginTop: 4, fontStyle: 'normal', color: 'rgba(255,255,255,.62)' }}>
+                        {varietyNotes[0]}
+                        {varietyNotes.length > 1 ? ` +${varietyNotes.length - 1}` : ''}
+                      </div>
+                    )}
                     <div className={`crop-dash-stage ${entry.status === 'planned' ? 'planned' : ''}`}>{stage}</div>
                     {daysLeft !== null && <div className="crop-dash-days">{daysLeft === 0 ? '🎉 Готов!' : `${daysLeft}д`}</div>}
                     {!perennial && <div className="crop-dash-bar"><div className="crop-dash-fill" style={{ width: `${pct}%` }} /></div>}
-                    {entry.varieties.length > 1 && entry.status === 'planted' && entry.sowDate && !perennial && (
+                    {namedVarieties.length > 1 && entry.status === 'planted' && entry.sowDate && !perennial && (
                       <div className="crop-variety-bars">
-                        {entry.varieties.map((v, vi) => {
+                        {namedVarieties.map((v, vi) => {
                           const vDays = v.days ?? totalDays
                           const vPct = Math.min(100, (days / vDays) * 100)
                           const vLeft = Math.max(0, vDays - days)

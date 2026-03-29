@@ -10,10 +10,11 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist --cname ogorod-ai.ru"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.2",
+    "@vkid/sdk": "^2.6.5",
     "@vkontakte/vk-bridge": "^2.15.11",
     "jspdf": "^4.2.1",
     "react": "^19.2.4",

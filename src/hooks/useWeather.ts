@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { WeatherData } from '../utils/types'
 
-const OWM_KEY = '74da32bba104679e8fe0a5d77b2d18fd'
+const OWM_KEY = (import.meta.env.VITE_OPENWEATHER_API_KEY as string | undefined)?.trim() ?? ''
 const EMPTY_WEATHER: WeatherData = {
   temp: 0,
   feels: 0,
@@ -41,6 +41,10 @@ export function useWeather(city: string): WeatherData {
 
   useEffect(() => {
     if (!city.trim()) return
+    if (!OWM_KEY) {
+      setW(EMPTY_WEATHER)
+      return
+    }
 
     fetch(
       `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${OWM_KEY}&units=metric&lang=ru`

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { OnboardingData, GardenObject, CropEntry } from '../../utils/types'
 import { CROP_CATEGORIES, GROW_OPTIONS, CROPS, NOTIF_CHANNELS, PLAN_SUMMARY_CARDS, empty, makeObject, getOps } from '../../utils/constants'
 import { CropVarietyPickerModal } from '../modals'
@@ -23,6 +23,13 @@ export function Onboarding({ onDone }: { onDone: (d: OnboardingData) => void }) 
   const back = () => setStep(s => s - 1)
   const skip = () => setStep(s => s + 1)
   const enclosedObjects = d.gardenObjects.filter(o => o.type === 'greenhouse' || o.type === 'hotbed')
+
+  useEffect(() => {
+    const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    if (browserTimeZone && !d.timeZone) {
+      set({ timeZone: browserTimeZone })
+    }
+  }, [d.timeZone])
 
   // Шаг 0: Приветствие + тарифы
   if (step === 0) return (
@@ -462,6 +469,21 @@ export function Onboarding({ onDone }: { onDone: (d: OnboardingData) => void }) 
             </button>
           })}
         </div>
+        {d.notifChannels.includes('email') && (
+          <>
+            <div className="ob-section-label">Email для советов</div>
+            <input
+              className="profile-edit-input"
+              style={{ width: '100%', marginBottom: 16 }}
+              type="email"
+              placeholder="name@example.com"
+              value={d.notificationEmail}
+              onChange={e => set({ notificationEmail: e.target.value })}
+              autoCapitalize="off"
+              autoCorrect="off"
+            />
+          </>
+        )}
         <div className="ob-section-label">Уровень уведомлений</div>
         <div className="ob-cards">
           {[

@@ -1,73 +1,108 @@
-# React + TypeScript + Vite
+# ОгородБот
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Веб-приложение для ведения огорода: культуры, объекты, дневник, советы агронома, прогноз погоды, лунный календарь, история сезонов, экспорт данных и уведомления по email и во ВКонтакте.
 
-Currently, two official plugins are available:
+Сайт: `https://ogorod-ai.ru`
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Что уже работает
 
-## React Compiler
+- вход по email magic link и через VK ID
+- профиль огорода, объекты, культуры и сорта
+- дневник по культурам и сезонам
+- советы агронома внутри приложения
+- утренние советы по расписанию
+- доставка советов в приложение, на email и во ВКонтакте
+- история сезонов и экспорт данных
+- прогноз погоды и лунный календарь
+- GitHub Actions cron для `Morning Advice`
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Локальный запуск
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Фронтовые переменные окружения
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Создайте `.env` со значениями:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<supabase-anon-key>
+VITE_VK_APP_ID=<vk-app-id>
+VITE_VK_REDIRECT_URI=https://ogorod-ai.ru
+VITE_OPENWEATHER_API_KEY=<openweathermap-api-key>
 ```
+
+## Supabase
+
+В проекте используются:
+
+- таблицы `garden_data`, `diary`, `seasons`, `notifications`, `billing_payments`, `analytics_events`
+- edge functions для утренних советов и оплаты
+
+Применить миграции:
+
+```bash
+supabase db push
+```
+
+## Утренние советы
+
+Серверная функция:
+
+- `generate-morning-advice`
+
+Нужные Supabase secrets:
+
+```bash
+RESEND_API_KEY=...
+ADVICE_FROM_EMAIL=advice@ogorod-ai.ru
+VK_COMMUNITY_TOKEN=...
+VK_API_VERSION=5.199
+```
+
+GitHub Actions вызывает функцию по расписанию через secret:
+
+```bash
+MORNING_ADVICE_URL=https://<project-ref>.supabase.co/functions/v1/generate-morning-advice
+```
+
+Подробности: [`docs/morning-advice-setup.md`](docs/morning-advice-setup.md)
+
+## ЮKassa
+
+В проекте уже подготовлены:
+
+- `create-yookassa-payment`
+- `get-yookassa-payment-status`
+- `yookassa-webhook`
+
+Для включения оплаты нужно задать secrets и webhook в YooKassa.
+
+Подробности: [`docs/yookassa-setup.md`](docs/yookassa-setup.md)
+
+## Полезные команды
+
+```bash
+npm run dev
+npm run build
+npm run deploy
+supabase functions deploy generate-morning-advice
+supabase functions deploy create-yookassa-payment
+supabase functions deploy get-yookassa-payment-status
+supabase functions deploy yookassa-webhook
+```
+
+## Деплой сайта
+
+Публикация идёт через `gh-pages`:
+
+```bash
+npm run deploy
+```
+
+## Текущее состояние
+
+Продукт уже готов к использованию без ЮKassa. Главный оставшийся платёжный хвост — боевая настройка YooKassa и, при желании, дальнейшая полировка документации и мониторинга.

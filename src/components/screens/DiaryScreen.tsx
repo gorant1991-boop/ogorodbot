@@ -50,12 +50,12 @@ export function DiaryScreen({ vkUserId, cropEntries }: { vkUserId: number; cropE
   return (
     <div style={{ padding: '0 0 80px' }}>
       {/* Фильтр по культуре */}
-      <div style={{ display: 'flex', gap: 8, padding: '12px 16px', overflowX: 'auto' }}>
-        <button className={`ob-chip ${!filterCrop ? 'selected' : ''}`} onClick={() => setFilterCrop(null)}>Все</button>
+      <div className="diary-filters">
+        <button className={`ob-chip diary-filter-chip ${!filterCrop ? 'selected' : ''}`} onClick={() => setFilterCrop(null)}>Все</button>
         {plantedCrops.map(e => {
           const crop = CROPS.find(c => c.id === e.id)
           return (
-            <button key={e.id} className={`ob-chip ${filterCrop === e.id ? 'selected' : ''}`}
+            <button key={e.id} className={`ob-chip diary-filter-chip ${filterCrop === e.id ? 'selected' : ''}`}
               onClick={() => setFilterCrop(filterCrop === e.id ? null : e.id)}>
               {crop?.icon} {crop?.name}
             </button>

@@ -191,13 +191,56 @@ export function getSubscriptionStatusLabel(subscription: SubscriptionInfo | null
   return `${subscription.level === 'base' ? 'Базовая' : 'Про'} · месяц`
 }
 
+export interface SubscriptionNotice {
+  title: string
+  body: string
+  tone: 'warning' | 'expired'
+}
+
+export function getSubscriptionNotice(subscription: SubscriptionInfo | null | undefined, now = new Date()): SubscriptionNotice | null {
+  if (!subscription) return null
+
+  const end = new Date(subscription.endsAt)
+  const diffMs = end.getTime() - now.getTime()
+  if (Number.isNaN(end.getTime())) return null
+
+  if (diffMs < 0) {
+    return {
+      title: 'Подписка закончилась',
+      body: `Платный доступ завершился ${formatDateLabel(subscription.endsAt)}. Тариф уже переведён на бесплатный, продлите доступ, чтобы вернуть все функции.`,
+      tone: 'expired',
+    }
+  }
+
+  const daysLeft = Math.ceil(diffMs / 86400000)
+  if (daysLeft <= 3) {
+    return {
+      title: daysLeft <= 1 ? 'Подписка заканчивается сегодня' : `До конца подписки ${daysLeft} дня`,
+      body: `Доступ активен до ${formatDateLabel(subscription.endsAt)}. Продлите заранее, чтобы не потерять расширенные функции и лимиты.`,
+      tone: 'warning',
+    }
+  }
+
+  return null
+}
+
 export const empty: OnboardingData = {
   city: '', 
   terrain: '', 
   gardenObjects: [], 
   cropEntries: [],
+  fertilizers: [],
+  notificationEmail: '',
+  vkContactUserId: 0,
+  referralCode: '',
+  referralAppliedCode: '',
+  referralInvitesAccepted: 0,
+  referralRewardsGranted: 0,
+  promoPostShares: 0,
+  lastPromoShareAt: null,
   experience: '', 
   tools: [], 
+  timeZone: '',
   notifMorning: '06:00', 
   notifEvening: '19:00',
   notifLevel: 'standard', 

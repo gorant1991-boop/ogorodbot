@@ -1,0 +1,29 @@
+project_id = "ogorodbot"
+
+[auth]
+site_url = "https://ogorod-ai.ru"
+additional_redirect_urls = [
+  "https://ogorod-ai.ru",
+  "https://ogorod-ai.ru/**",
+  "http://localhost:5174",
+  "http://localhost:5174/**"
+]
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+secure_password_change = false
+max_frequency = "1m0s"
+otp_length = 8
+otp_expiry = 3600
+
+[functions.yookassa-webhook]
+verify_jwt = false
+
+[functions.generate-morning-advice]
+verify_jwt = false

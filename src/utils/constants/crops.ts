@@ -152,10 +152,8 @@ export const CROP_OPERATIONS: Record<string, { id: string; label: string }[]> = 
 
 // ============= Уведомления =============
 export const NOTIF_CHANNELS = [
+  { id: 'email', icon: '✉️', label: 'Email' },
   { id: 'vk', icon: '💙', label: 'ВКонтакте' },
-  { id: 'tg', icon: '✈️', label: 'Telegram' },
-  { id: 'ok', icon: '🟠', label: 'Одноклассники' },
-  { id: 'push', icon: '🔔', label: 'Push (браузер)' },
 ]
 
 // ============= Растущие объекты =============

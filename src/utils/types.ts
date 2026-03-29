@@ -16,7 +16,7 @@ export interface SubscriptionInfo {
   amount: number
   baseAmount: number
   discountPercent: number
-  source: 'manual' | 'vk_pay'
+  source: 'manual' | 'vk_pay' | 'yookassa'
 }
 
 export interface GardenObject {
@@ -38,6 +38,15 @@ export interface CropVariety {
   name: string
   days?: number
   desc?: string
+  note?: string
+}
+
+export interface FertilizerItem {
+  id: string
+  name: string
+  brand?: string
+  composition?: string
+  note?: string
 }
 
 export interface CropEntry {
@@ -57,8 +66,18 @@ export interface OnboardingData {
   terrain: string
   gardenObjects: GardenObject[]
   cropEntries: CropEntry[]
+  fertilizers: FertilizerItem[]
+  notificationEmail: string
+  vkContactUserId?: number
+  referralCode?: string
+  referralAppliedCode?: string
+  referralInvitesAccepted?: number
+  referralRewardsGranted?: number
+  promoPostShares?: number
+  lastPromoShareAt?: string | null
   experience: string
   tools: string[]
+  timeZone: string
   notifMorning: string
   notifEvening: string
   notifLevel: string
@@ -123,4 +142,3 @@ export interface WeekDay {
   temp: number
   humidity: number
 }
-

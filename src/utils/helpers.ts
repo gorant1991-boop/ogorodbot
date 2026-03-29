@@ -102,14 +102,26 @@ export function parseDiaryText(text: string): { varietyName: string | null; text
 export function getWeatherRisks(
   temp: number,
   humidity: number,
-  crops: CropEntry[]
+  crops: CropEntry[],
+  gardenObjects: GardenObject[] = []
 ): { text: string; type: 'ok' | 'warn' | 'danger' }[] {
   const risks: { text: string; type: 'ok' | 'warn' | 'danger' }[] = []
   const ids = crops.map(c => c.id)
+  const enclosedObjects = gardenObjects.filter(
+    object => (object.type === 'greenhouse' || object.type === 'hotbed') && object.ventilationReminders
+  )
 
   if (temp <= 0) risks.push({ text: '❄️ Заморозок! Укройте растения', type: 'danger' })
   else if (temp <= 3) risks.push({ text: '🌡️ Риск заморозка ночью', type: 'warn' })
   else risks.push({ text: '✓ Заморозков нет', type: 'ok' })
+
+  if (temp <= 3 && enclosedObjects.length > 0) {
+    const enclosedLabel = enclosedObjects.length === 1 ? enclosedObjects[0].name : 'парники и теплицы'
+    risks.push({
+      text: `🏠 Ночью похолодание: закройте ${enclosedLabel}`,
+      type: temp <= 0 ? 'danger' : 'warn',
+    })
+  }
 
   if (temp >= 15 && temp <= 25 && humidity >= 75 && ids.some(id => ['tomato', 'potato'].includes(id)))
     risks.push({ text: '⚠️ Риск фитофторы', type: 'warn' })

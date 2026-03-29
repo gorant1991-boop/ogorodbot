@@ -1,5 +1,6 @@
 import { Component, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import bridge from '@vkontakte/vk-bridge'
 import './index.css'
 import App from './App.tsx'
 
@@ -11,8 +12,7 @@ declare global {
 
 async function initVkBridge() {
   try {
-    const bridge = await import('@vkontakte/vk-bridge')
-    await bridge.default.send('VKWebAppInit')
+    await bridge.send('VKWebAppInit')
   } catch (e) {
     console.log('bridge error', e)
   }

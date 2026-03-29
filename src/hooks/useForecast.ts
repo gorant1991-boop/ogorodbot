@@ -8,7 +8,7 @@ export interface ForecastDay {
   desc: string
 }
 
-const OWM_KEY = '74da32bba104679e8fe0a5d77b2d18fd'
+const OWM_KEY = (import.meta.env.VITE_OPENWEATHER_API_KEY as string | undefined)?.trim() ?? ''
 const EMPTY_FORECAST = {
   days: [] as ForecastDay[],
   loading: false,
@@ -48,6 +48,10 @@ export function useForecast(city: string): {
 
   useEffect(() => {
     if (!city.trim()) return
+    if (!OWM_KEY) {
+      setF(EMPTY_FORECAST)
+      return
+    }
 
     fetch(
       `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${OWM_KEY}&units=metric&lang=ru&cnt=56`

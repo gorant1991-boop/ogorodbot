@@ -12,7 +12,7 @@ export function CropEditModal({ entry, gardenObjects, onSave, onDelete, onClose,
   onAskAi: (cropId: string, varietyName?: string) => void
   plan?: Plan
 }) {
-  const [e, setE] = useState<CropEntry>({ ...entry, varieties: [...entry.varieties] })
+  const [e, setE] = useState<CropEntry>({ ...entry, varieties: entry.varieties.map(v => ({ ...v })) })
   const crop = CROPS.find(c => c.id === e.id)!
   const upd = (patch: Partial<CropEntry>) => setE(prev => ({ ...prev, ...patch }))
   const suggestedVarieties = CROP_VARIETIES[e.id] ?? []
@@ -91,13 +91,30 @@ export function CropEditModal({ entry, gardenObjects, onSave, onDelete, onClose,
 
         <div className="modal-section-label">Сорта</div>
         {e.varieties.map((v, vi) => (
-          <div key={vi} className="ob-variety-row">
-            <input className="ob-variety-input" value={v.name} placeholder={`Сорт ${vi + 1}`}
-              onChange={ev => {
-                const vars = [...e.varieties]; vars[vi] = { ...vars[vi], name: ev.target.value }; upd({ varieties: vars })
-              }} />
-            {v.days && <span className="variety-days-badge">{v.days}д</span>}
-            <button className="ob-variety-del" onClick={() => upd({ varieties: e.varieties.filter((_, i) => i !== vi) })}>✕</button>
+          <div key={vi} className="variety-entry">
+            <div className="ob-variety-row">
+              <input className="ob-variety-input" value={v.name} placeholder={`Сорт ${vi + 1}`}
+                onChange={ev => {
+                  const vars = [...e.varieties]; vars[vi] = { ...vars[vi], name: ev.target.value }; upd({ varieties: vars })
+                }} />
+              {v.days && <span className="variety-days-badge">{v.days}д</span>}
+              <button className="ob-variety-del" onClick={() => upd({ varieties: e.varieties.filter((_, i) => i !== vi) })}>✕</button>
+            </div>
+            <div className="variety-note-row">
+              <input
+                className="ob-variety-input variety-note-input"
+                value={v.note ?? ''}
+                placeholder="Пометка по сорту: подвязан, маленький, отстаёт, уже цветёт..."
+                onChange={ev => {
+                  const vars = [...e.varieties]; vars[vi] = { ...vars[vi], note: ev.target.value }; upd({ varieties: vars })
+                }}
+              />
+              {v.name.trim() && (
+                <button className="variety-quick-btn" onClick={() => onAddDiary(e.id, v.name.trim())}>
+                  📝 В дневник
+                </button>
+              )}
+            </div>
           </div>
         ))}
         {suggestedVarieties.filter(s => !addedNames.includes(s.name)).length > 0 && (
