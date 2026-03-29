@@ -1,0 +1,24 @@
+name: Morning Advice
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger morning advice function
+        env:
+          MORNING_ADVICE_URL: ${{ secrets.MORNING_ADVICE_URL }}
+        run: |
+          if [ -z "$MORNING_ADVICE_URL" ]; then
+            echo "Missing MORNING_ADVICE_URL secret"
+            exit 1
+          fi
+
+          curl --fail --show-error --silent \
+            -X POST "$MORNING_ADVICE_URL" \
+            -H "Content-Type: application/json" \
+            -d '{}'
