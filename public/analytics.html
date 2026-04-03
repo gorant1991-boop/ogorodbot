@@ -164,18 +164,9 @@
 
 <script>
   // Пароль: ogorod2026
-  const ACCESS_HASH = '6a4d6d0703fce2e2';
-
-  function hashCode(str) {
-    let h = 0;
-    for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
-    return (h >>> 0).toString(16).padStart(8, '0');
-  }
-
   function checkPassword() {
     const val = document.getElementById('password-input').value;
-    const key = hashCode(val) + hashCode(val.split('').reverse().join(''));
-    if (key === ACCESS_HASH) {
+    if (btoa(val) === 'b2dvcm9kMjAyNg==') {
       sessionStorage.setItem('analytics_ok', '1');
       show();
     } else {
