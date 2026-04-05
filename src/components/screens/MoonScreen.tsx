@@ -1,27 +1,56 @@
-import { useEffect } from 'react'
-import type { CropEntry, Plan } from '../../utils/types'
-import { CROPS, MOON_PHASE_NAMES, MOON_GOOD, MOON_BAD } from '../../utils/constants'
-import { useMoon, useForecast, useWeeklyPlan } from '../../hooks'
+import type { Plan, RainObservation, RainObservationStatus } from '../../utils/types'
+import { MOON_PHASE_NAMES, MOON_GOOD, MOON_BAD, formatDateLabel, getRainObservation, getRainObservationLabel } from '../../utils/constants'
+import { useMoon, useForecast } from '../../hooks'
+import type { WeekDay } from '../../hooks'
 
-export function MoonScreen({ plan, city, vkUserId, cropEntries = [] }: { plan: Plan; city: string; vkUserId: number; cropEntries?: CropEntry[] }) {
+function getLocalDateKey(value: string | Date) {
+  return new Date(value).toLocaleDateString('en-CA')
+}
+
+export function MoonScreen({
+  plan,
+  city,
+  rainObservations = [],
+  weeklyPlannerAccess = false,
+  weeklyPlanAccessUntil = null,
+  weeklyPlanDays = [],
+  weeklyPlanLoading = false,
+  weeklyPlanError = false,
+  onUpdateRainObservation,
+  onOpenUpgrade,
+}: {
+  plan: Plan
+  city: string
+  rainObservations?: RainObservation[]
+  weeklyPlannerAccess?: boolean
+  weeklyPlanAccessUntil?: string | null
+  weeklyPlanDays?: WeekDay[]
+  weeklyPlanLoading?: boolean
+  weeklyPlanError?: boolean
+  onUpdateRainObservation?: (date: string, status: RainObservationStatus) => void
+  onOpenUpgrade?: () => void
+}) {
   const moon = useMoon()
   const forecast = useForecast(city)
-  const weekPlan = useWeeklyPlan(vkUserId, plan === 'pro')
   const phaseName = MOON_PHASE_NAMES[moon.phase] ?? moon.phase
-  
-  // Логирование культур при загрузке/смене
-  useEffect(() => {
-    const plantedCrops = cropEntries.filter(e => e.status === 'planted').map(e => CROPS.find(c => c.id === e.id)?.name || e.id)
-    console.log('[Moon Calendar] Planted cultures for recommendations:', {
-      total: cropEntries.length,
-      planted: plantedCrops.length,
-      crops: plantedCrops,
-      allCropIds: cropEntries.map(e => e.id),
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown'
-    })
-  }, [cropEntries])
   const good = MOON_GOOD[moon.phase] ?? 'Полив, уход за растениями'
   const bad = MOON_BAD[moon.phase] ?? 'Обрезка'
+  const todayKey = getLocalDateKey(new Date())
+  const todayForecast = forecast.days.find(day => day.date === todayKey) ?? forecast.days[0] ?? null
+  const todayPlan = weeklyPlanDays.find(day => getLocalDateKey(day.date) === todayKey) ?? null
+  const todayNeedsRainCheck = Boolean(todayForecast && (
+    todayForecast.rainExpected
+    || todayPlan?.tasks.some(task => {
+      const normalized = task.action.toLowerCase()
+      return normalized.includes('полив') || normalized.includes('опрыск')
+    })
+  ))
+  const todayRainObservation = getRainObservation(rainObservations, todayKey)
+  const rainObservationOptions: Array<{ value: RainObservationStatus; label: string }> = [
+    { value: 'soaked', label: 'Хорошо промочило' },
+    { value: 'light', label: 'Только слегка' },
+    { value: 'missed', label: 'Нас обошло' },
+  ]
 
   return (
     <div className="tab-content">
@@ -43,17 +72,25 @@ export function MoonScreen({ plan, city, vkUserId, cropEntries = [] }: { plan: P
         <div className="moon-card-title">❌ Не рекомендуется</div>
         <div className="moon-card-body">{moon.loading ? '...' : bad}</div>
       </div>
+      <div className="section-helper" style={{ padding: '0 16px 4px' }}>
+        Лунный календарь подсказывает общий ритм работ. Если сомневаетесь, ориентируйтесь в первую очередь на погоду и состояние растений.
+      </div>
 
       {/* Недельный план */}
-      {plan === 'pro' ? (
+      {weeklyPlannerAccess ? (
       <div className="moon-card" style={{ marginTop: 10 }}>
         <div className="moon-card-title">📅 План на неделю</div>
-        {weekPlan.loading && <div className="moon-card-body">Составляю план...</div>}
-        {weekPlan.error && <div className="moon-card-body" style={{ color: '#f87171' }}>Не удалось загрузить план</div>}
-        {!weekPlan.loading && !weekPlan.error && weekPlan.days.length === 0 && (
+        {plan !== 'pro' && weeklyPlanAccessUntil && (
+          <div className="moon-card-body" style={{ marginBottom: 10 }}>
+            Отдельный доступ активен до {formatDateLabel(weeklyPlanAccessUntil)}.
+          </div>
+        )}
+        {weeklyPlanLoading && <div className="moon-card-body">Составляю план...</div>}
+        {weeklyPlanError && <div className="moon-card-body" style={{ color: '#f87171' }}>Не удалось загрузить план</div>}
+        {!weeklyPlanLoading && !weeklyPlanError && weeklyPlanDays.length === 0 && (
           <div className="moon-card-body" style={{ color: '#64748b' }}>Добавьте посаженные культуры чтобы получить план</div>
         )}
-        {weekPlan.days.map(day => {
+        {weeklyPlanDays.map(day => {
           const d = new Date(day.date)
           const label = d.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })
           const cropName = (id: string) => {
@@ -88,12 +125,39 @@ export function MoonScreen({ plan, city, vkUserId, cropEntries = [] }: { plan: P
             </div>
           )
         })}
+        {todayNeedsRainCheck && (
+          <div className="rain-observation-card">
+            <div className="rain-observation-title">🌧️ Уточните дождь по факту</div>
+            <div className="rain-observation-text">
+              Прогноз по городу не всегда совпадает с участком. Это уточнение поможет не промахнуться с поливом и опрыскиванием сегодня.
+            </div>
+            <div className="rain-observation-actions">
+              {rainObservationOptions.map(option => (
+                <button
+                  key={option.value}
+                  className={`ob-chip ${todayRainObservation?.status === option.value ? 'selected' : ''}`}
+                  onClick={() => onUpdateRainObservation?.(todayKey, option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            {todayRainObservation && (
+              <div className="rain-observation-meta">
+                Сейчас учтено: {getRainObservationLabel(todayRainObservation.status)}.
+              </div>
+            )}
+          </div>
+        )}
       </div>
       ) : (
         <div className="plan-promo">
           <div className="plan-promo-icon">📅</div>
-          <div><div className="plan-promo-title">План на неделю</div><div className="plan-promo-sub">Доступно в Про: 300 ₽/мес или сезон со скидкой 20%</div></div>
-          <button className="btn-upgrade">Подключить</button>
+          <div>
+            <div className="plan-promo-title">План на неделю</div>
+            <div className="plan-promo-sub">Можно купить отдельно за 99 ₽ без Базовой или Про. В Про он уже включён.</div>
+          </div>
+          <button className="btn-upgrade" onClick={onOpenUpgrade}>Открыть оплату</button>
         </div>
       )}
 
@@ -101,7 +165,7 @@ export function MoonScreen({ plan, city, vkUserId, cropEntries = [] }: { plan: P
         forecast.loading ? (
           <div className="moon-card"><div className="moon-card-body">Загрузка прогноза...</div></div>
         ) : forecast.error ? (
-          <div className="moon-card moon-card-warn"><div className="moon-card-body">Прогноз недоступен — проверьте город в профиле</div></div>
+          <div className="moon-card moon-card-warn"><div className="moon-card-body">{forecast.error}</div></div>
         ) : (
           <div className="moon-card">
             <div className="moon-card-title">🌤️ Прогноз на 7 дней</div>
@@ -120,8 +184,8 @@ export function MoonScreen({ plan, city, vkUserId, cropEntries = [] }: { plan: P
       ) : (
         <div className="plan-promo">
           <div className="plan-promo-icon">🌿</div>
-          <div><div className="plan-promo-title">Прогноз на 7 дней</div><div className="plan-promo-sub">Доступно в Базовой: 150 ₽/мес или сезон со скидкой 20%</div></div>
-          <button className="btn-upgrade">Подключить</button>
+          <div><div className="plan-promo-title">Прогноз на 7 дней</div><div className="plan-promo-sub">Доступно в Базовой за 150 ₽ в месяц. В Про тоже входит.</div></div>
+          <button className="btn-upgrade" onClick={onOpenUpgrade}>Открыть тарифы</button>
         </div>
       )}
     </div>

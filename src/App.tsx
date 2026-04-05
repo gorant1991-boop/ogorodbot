@@ -654,12 +654,12 @@ export default function App() {
         ? '/owner-analytics'
         : `/${screen}`
     const nextTitle = screen === 'main'
-      ? `ОгородБот — ${tab}`
+      ? `МойАгроном — ${tab}`
       : screen === 'chat'
-        ? 'ОгородБот — AI Агроном'
+        ? 'МойАгроном — AI Агроном'
         : screen === 'owner-analytics'
-          ? 'ОгородБот — Owner Analytics'
-          : 'ОгородБот'
+          ? 'МойАгроном — Owner Analytics'
+          : 'МойАгроном'
 
     if (!analyticsInitialViewTrackedRef.current) {
       analyticsInitialViewTrackedRef.current = true
@@ -856,10 +856,10 @@ export default function App() {
           <div className="install-banner-title">Удобнее заходить с иконки</div>
           <div className="install-banner-text">
             {isIosHint
-              ? 'Откройте меню Поделиться в Safari и выберите «На экран Домой», чтобы ОгородБот запускался как приложение.'
+              ? 'Откройте меню Поделиться в Safari и выберите «На экран Домой», чтобы МойАгроном запускался как приложение.'
               : isAndroidHint
                 ? 'Откройте меню браузера и выберите «Добавить на главный экран» или «Установить приложение», чтобы входить в один тап.'
-                : 'Добавьте ОгородБот на главный экран, и вход будет в один тап, почти как в обычное приложение.'}
+                : 'Добавьте МойАгроном на главный экран, и вход будет в один тап, почти как в обычное приложение.'}
           </div>
         </div>
         <div className="install-banner-actions">
@@ -1304,7 +1304,7 @@ export default function App() {
     return (
       <div className="site-auth-screen">
         <div className="site-auth-header">
-          <div className="site-auth-brand">🌱 ОгородБот</div>
+          <div className="site-auth-brand">🌱 МойАгроном</div>
         </div>
 
         <div className="site-auth-content">
@@ -1316,7 +1316,7 @@ export default function App() {
             <div className="site-auth-hero-veg veg-eggplant">🍆</div>
             <div className="site-auth-logo">🌿</div>
           </div>
-          <h1 className="site-auth-title">ОгородБот</h1>
+          <h1 className="site-auth-title">МойАгроном</h1>
           <p className="site-auth-subtitle">План, дневник и советы по вашему огороду</p>
 
           <div className="site-auth-choice">

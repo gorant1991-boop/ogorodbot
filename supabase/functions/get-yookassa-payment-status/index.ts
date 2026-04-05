@@ -5,11 +5,14 @@ Deno.serve(async (request) => {
   if (cors) return cors
 
   try {
-    const { paymentId } = await request.json()
+    const { paymentId, vkUserId } = await request.json()
     if (!paymentId) return json({ error: 'paymentId is required' }, 400)
 
     const payment = await fetchPaymentStatus(String(paymentId))
-    const subscription = payment.status === 'succeeded' && payment.paid
+    if (Number(vkUserId ?? 0) > 0 && Number(payment.metadata?.vk_user_id ?? 0) !== Number(vkUserId)) {
+      return json({ error: 'Платёж привязан к другому пользователю' }, 403)
+    }
+    const applied = payment.status === 'succeeded' && payment.paid
       ? await applySuccessfulPayment(payment)
       : null
 
@@ -17,7 +20,9 @@ Deno.serve(async (request) => {
       paymentId: payment.id,
       status: payment.status,
       paid: payment.paid,
-      subscription,
+      subscription: applied?.subscription ?? null,
+      onboardingPatch: applied?.onboardingPatch ?? null,
+      offerId: applied?.offerId ?? null,
     })
   } catch (error) {
     return json({

@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>МойАгроном — бесплатная диагностика</title>
+    <style>
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        margin: 0;
+        width: 1200px;
+        height: 900px;
+        overflow: hidden;
+        font-family: "Nunito", "SF Pro Display", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 14% 12%, rgba(116, 255, 162, 0.18), transparent 28%),
+          radial-gradient(circle at 82% 16%, rgba(111, 207, 255, 0.12), transparent 22%),
+          radial-gradient(circle at 74% 84%, rgba(74, 222, 128, 0.12), transparent 24%),
+          linear-gradient(180deg, #0f2016 0%, #09120d 100%);
+        color: #f4fff6;
+      }
+
+      body::before,
+      body::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        filter: blur(26px);
+        opacity: 0.55;
+        pointer-events: none;
+      }
+
+      body::before {
+        width: 360px;
+        height: 360px;
+        top: 90px;
+        left: -100px;
+        background: radial-gradient(circle, rgba(74, 222, 128, 0.28), transparent 68%);
+      }
+
+      body::after {
+        width: 420px;
+        height: 420px;
+        right: -110px;
+        bottom: 90px;
+        background: radial-gradient(circle, rgba(96, 165, 250, 0.16), transparent 72%);
+      }
+
+      .canvas {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        padding: 48px;
+      }
+
+      .frame {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        border-radius: 34px;
+        background: linear-gradient(180deg, rgba(10, 21, 14, 0.96), rgba(8, 14, 10, 0.99));
+        border: 1px solid rgba(255,255,255,.08);
+        box-shadow:
+          0 36px 120px rgba(0,0,0,.34),
+          inset 0 1px 0 rgba(255,255,255,.05);
+        overflow: hidden;
+      }
+
+      .frame::before {
+        content: "";
+        position: absolute;
+        inset: 10px;
+        border-radius: 26px;
+        border: 1px solid rgba(255,255,255,.05);
+        pointer-events: none;
+      }
+
+      .hero {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: 1.06fr 0.94fr;
+        gap: 28px;
+        width: 100%;
+        height: 100%;
+        padding: 40px 40px 34px 40px;
+      }
+
+      .copy {
+        padding-top: 6px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: 999px;
+        background: rgba(255,255,255,.05);
+        border: 1px solid rgba(255,255,255,.08);
+        backdrop-filter: blur(12px);
+      }
+
+      .brand-badge {
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #4ade80, #15803d);
+        box-shadow: 0 12px 24px rgba(22, 163, 74, .28);
+        font-size: 18px;
+      }
+
+      .brand-name {
+        font-size: 26px;
+        font-weight: 900;
+        letter-spacing: -.03em;
+      }
+
+      .eyebrow {
+        margin-top: 24px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(74, 222, 128, .10);
+        border: 1px solid rgba(74, 222, 128, .22);
+        font-size: 14px;
+        font-weight: 900;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: #d7ffe4;
+      }
+
+      h1 {
+        margin: 24px 0 0;
+        font-size: 80px;
+        line-height: .94;
+        font-weight: 900;
+        letter-spacing: -.07em;
+        max-width: 520px;
+      }
+
+      .lead {
+        margin-top: 18px;
+        max-width: 470px;
+        font-size: 29px;
+        line-height: 1.18;
+        color: rgba(241,255,245,.76);
+        font-weight: 700;
+      }
+
+      .chips {
+        margin-top: 24px;
+        display: grid;
+        gap: 12px;
+        max-width: 490px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        width: fit-content;
+        min-width: 360px;
+        padding: 14px 18px;
+        border-radius: 18px;
+        background: rgba(255,255,255,.06);
+        border: 1px solid rgba(255,255,255,.08);
+        font-size: 18px;
+        font-weight: 800;
+        color: rgba(245,255,247,.92);
+        backdrop-filter: blur(8px);
+      }
+
+      .chip-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #86f7ad, #43c972);
+        box-shadow: 0 0 0 7px rgba(74, 222, 128, .10);
+        flex: none;
+      }
+
+      .cta {
+        margin-top: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px 30px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, #4ade80, #16a34a);
+        color: #fff;
+        box-shadow: 0 20px 38px rgba(22, 163, 74, .30);
+        font-size: 28px;
+        font-weight: 900;
+        letter-spacing: -.03em;
+      }
+
+      .footnote {
+        margin-top: 18px;
+        font-size: 13px;
+        color: rgba(255,255,255,.48);
+        font-weight: 700;
+      }
+
+      .visual {
+        position: relative;
+        min-height: 100%;
+      }
+
+      .glow {
+        position: absolute;
+        width: 520px;
+        height: 520px;
+        right: -30px;
+        top: 100px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(74, 222, 128, .22), transparent 70%);
+        filter: blur(20px);
+      }
+
+      .app-card {
+        position: absolute;
+        inset: 12px 0 22px 12px;
+        border-radius: 34px;
+        background: linear-gradient(180deg, rgba(14,26,17,.94), rgba(8,15,11,.98));
+        border: 1px solid rgba(255,255,255,.08);
+        box-shadow:
+          0 30px 90px rgba(0,0,0,.42),
+          inset 0 1px 0 rgba(255,255,255,.08);
+        overflow: hidden;
+      }
+
+      .app-card::before {
+        content: "";
+        position: absolute;
+        inset: 10px;
+        border-radius: 28px;
+        border: 1px solid rgba(255,255,255,.06);
+        pointer-events: none;
+      }
+
+      .app-header {
+        padding: 22px 22px 14px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+      }
+
+      .app-top-label {
+        font-size: 12px;
+        color: rgba(255,255,255,.42);
+        font-weight: 700;
+      }
+
+      .app-date {
+        margin-top: 4px;
+        font-size: 34px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      .moon-pill {
+        margin-top: 6px;
+        border-radius: 18px;
+        border: 1px solid rgba(250,204,21,.25);
+        background: rgba(250,204,21,.10);
+        color: #fde68a;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .screen-title {
+        padding: 0 22px;
+        font-size: 14px;
+        font-weight: 900;
+        color: rgba(255,255,255,.7);
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+
+      .main-card {
+        margin: 14px 22px 10px;
+        padding: 18px;
+        border-radius: 24px;
+        background: linear-gradient(135deg, rgba(33,69,48,.96), rgba(18,42,29,.92));
+        border: 1px solid rgba(120,255,180,.16);
+      }
+
+      .main-card-top {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        justify-content: space-between;
+      }
+
+      .main-card-title {
+        font-size: 26px;
+        font-weight: 900;
+        line-height: 1.05;
+      }
+
+      .main-card-body {
+        margin-top: 10px;
+        font-size: 16px;
+        line-height: 1.45;
+        color: rgba(255,255,255,.78);
+      }
+
+      .score-box {
+        min-width: 112px;
+        border-radius: 18px;
+        background: rgba(255,255,255,.08);
+        border: 1px solid rgba(255,255,255,.10);
+        padding: 14px 12px;
+        text-align: center;
+      }
+
+      .score-box strong {
+        display: block;
+        font-size: 34px;
+        line-height: 1;
+        color: #bbf7d0;
+      }
+
+      .score-box span {
+        display: block;
+        margin-top: 6px;
+        font-size: 11px;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,.54);
+        font-weight: 800;
+      }
+
+      .tag-row {
+        margin-top: 14px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .tag {
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .tag-ok {
+        background: rgba(74,222,128,.14);
+        border: 1px solid rgba(74,222,128,.25);
+        color: #bbf7d0;
+      }
+
+      .tag-neutral {
+        background: rgba(255,255,255,.06);
+        border: 1px solid rgba(255,255,255,.09);
+        color: rgba(255,255,255,.72);
+      }
+
+      .filters {
+        margin: 0 22px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .filter-chip {
+        padding: 10px 13px;
+        border-radius: 14px;
+        font-size: 13px;
+        font-weight: 800;
+        background: rgba(255,255,255,.05);
+        border: 1px solid rgba(255,255,255,.08);
+        color: rgba(255,255,255,.78);
+      }
+
+      .filter-chip.selected {
+        background: rgba(74,222,128,.12);
+        border-color: rgba(74,222,128,.22);
+        color: #d7ffe4;
+      }
+
+      .result-card {
+        margin: 14px 22px 10px;
+        border-radius: 22px;
+        background: rgba(15, 23, 42, 0.58);
+        border: 1px solid rgba(74,222,128,.16);
+        padding: 16px;
+      }
+
+      .result-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .result-title {
+        font-size: 22px;
+        font-weight: 900;
+        line-height: 1.1;
+        max-width: 280px;
+      }
+
+      .result-badge {
+        padding: 8px 11px;
+        border-radius: 999px;
+        background: rgba(251,191,36,.14);
+        border: 1px solid rgba(251,191,36,.25);
+        color: #fde68a;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .result-summary {
+        margin-top: 10px;
+        font-size: 14px;
+        line-height: 1.45;
+        color: rgba(255,255,255,.76);
+      }
+
+      .fert-card {
+        margin: 10px 22px 0;
+        border-radius: 18px;
+        background: rgba(74,222,128,.08);
+        border: 1px solid rgba(74,222,128,.18);
+        padding: 14px 16px;
+      }
+
+      .fert-title {
+        font-size: 14px;
+        font-weight: 900;
+        color: #dcfce7;
+      }
+
+      .fert-body {
+        margin-top: 8px;
+        font-size: 13px;
+        line-height: 1.48;
+        color: #bbf7d0;
+      }
+
+      .bottom-bar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        justify-content: space-around;
+        padding: 12px 18px 16px;
+        border-top: 1px solid rgba(255,255,255,.08);
+        background: rgba(8,14,10,.98);
+      }
+
+      .tab {
+        text-align: center;
+        color: rgba(255,255,255,.45);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .tab strong {
+        display: block;
+        font-size: 12px;
+        font-weight: 900;
+        color: #4ade80;
+        margin-top: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="canvas">
+      <div class="frame">
+        <div class="hero">
+          <section class="copy">
+            <div class="brand">
+              <div class="brand-badge">🌿</div>
+              <div class="brand-name">МойАгроном</div>
+            </div>
+
+            <div class="eyebrow">Бесплатная диагностика</div>
+
+            <h1>Что с растением сегодня</h1>
+
+            <div class="lead">
+              Пятна, налёт, вялость, вредители. Быстро сузьте причину по симптомам и вашим культурам.
+            </div>
+
+            <div class="chips">
+              <div class="chip"><span class="chip-dot"></span> Без фото и без лишних трат</div>
+              <div class="chip"><span class="chip-dot"></span> Работает по всем культурам в приложении</div>
+              <div class="chip"><span class="chip-dot"></span> Помнит ваши удобрения и не даёт лечить вслепую</div>
+            </div>
+
+            <div class="cta">Открыть бесплатно</div>
+            <div class="footnote">ogorod-ai.ru</div>
+          </section>
+
+          <section class="visual">
+            <div class="glow"></div>
+            <div class="app-card">
+              <div class="app-header">
+                <div>
+                  <div class="app-top-label">Добрый вечер, Антон</div>
+                  <div class="app-date">4 апреля</div>
+                </div>
+                <div class="moon-pill">🌙 Луна</div>
+              </div>
+
+              <div class="screen-title">Болезни</div>
+
+              <div class="main-card">
+                <div class="main-card-top">
+                  <div>
+                    <div class="main-card-title">Бесплатная диагностика по симптомам</div>
+                    <div class="main-card-body">
+                      Выберите, где проблема и что видно сильнее всего. Диагностика быстро сужает круг причин по вашим культурам.
+                    </div>
+                  </div>
+                  <div class="score-box">
+                    <strong>3</strong>
+                    <span>версии</span>
+                  </div>
+                </div>
+                <div class="tag-row">
+                  <div class="tag tag-ok">🍅 Томат</div>
+                  <div class="tag tag-neutral">Листья</div>
+                  <div class="tag tag-neutral">Желтеет</div>
+                  <div class="tag tag-neutral">Снизу</div>
+                </div>
+              </div>
+
+              <div class="filters">
+                <div class="filter-chip selected">Почва сырая</div>
+                <div class="filter-chip">После дождей</div>
+                <div class="filter-chip">Были холодные ночи</div>
+              </div>
+
+              <div class="result-card">
+                <div class="result-top">
+                  <div class="result-title">Нехватка питания или стресс корней</div>
+                  <div class="result-badge">Проверить сегодня</div>
+                </div>
+                <div class="result-summary">
+                  Когда нижние листья желтеют первыми, причина часто в режиме влаги, охлаждении корней или мягком дефиците питания.
+                </div>
+              </div>
+
+              <div class="fert-card">
+                <div class="fert-title">Диагностика помнит ваши удобрения</div>
+                <div class="fert-body">
+                  Под рукой: кальциевая селитра, биогумус, универсальное NPK. Сначала сверьтесь с тем, что уже есть, и не давайте несколько подкормок подряд.
+                </div>
+              </div>
+
+              <div class="bottom-bar">
+                <div class="tab">🌱<strong>Растения</strong></div>
+                <div class="tab">📘 Дневник</div>
+                <div class="tab">🌙 Луна</div>
+                <div class="tab">👤 Профиль</div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

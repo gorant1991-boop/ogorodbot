@@ -1,10 +1,13 @@
 // ============= TypeScript интерфейсы для OgorodBot =============
 
 // ─── Типы ──────────────────────────────────────────────────────────
-export type Screen = 'onboarding' | 'main' | 'chat'
+export type Screen = 'onboarding' | 'main' | 'chat' | 'owner-analytics'
 export type Tab = 'main' | 'plants' | 'moon' | 'diary' | 'profile'
 export type Plan = 'free' | 'base' | 'pro'
 export type BillingPeriod = 'monthly' | 'seasonal'
+export type CheckoutOfferKind = 'subscription' | 'weekly_plan'
+export type AddressStyle = 'informal' | 'formal'
+export type UITextScale = 'normal' | 'large'
 
 export interface SubscriptionInfo {
   level: Exclude<Plan, 'free'>
@@ -49,26 +52,57 @@ export interface FertilizerItem {
   note?: string
 }
 
+export type DiaryEntryKind = 'done' | 'observation' | 'plan'
+export type RainObservationStatus = 'soaked' | 'light' | 'missed'
+
+export interface RainObservation {
+  date: string
+  status: RainObservationStatus
+  updatedAt: string
+}
+
+export interface CropOperationMemoryEntry {
+  lastDoneAt: string
+  count: number
+  lastNote?: string
+  varietyName?: string | null
+  lastEntryId?: number
+  lastDetail?: string | null
+}
+
+export type CropOperationMemory = Record<string, CropOperationMemoryEntry>
+
 export interface CropEntry {
   id: string
   location: string
   sowDate: string
+  emergenceDate?: string
   sowMethod: 'seeds' | 'seedling' | ''
+  maturityDays?: number
   status: 'planned' | 'planted'
   priority: 'main' | 'extra'
   notifs: string[]
   varieties: CropVariety[]
   plantYear?: number
+  operationMemory?: CropOperationMemory
 }
 
 export interface OnboardingData {
   city: string
+  displayName: string
+  addressStyle: AddressStyle
+  uiTextScale: UITextScale
+  helpHintsEnabled: boolean
+  introSeen?: boolean
+  seenHints: string[]
   terrain: string
   gardenObjects: GardenObject[]
   cropEntries: CropEntry[]
   fertilizers: FertilizerItem[]
   notificationEmail: string
   vkContactUserId?: number
+  telegramChatId?: number
+  telegramUsername?: string
   referralCode?: string
   referralAppliedCode?: string
   referralInvitesAccepted?: number
@@ -77,11 +111,20 @@ export interface OnboardingData {
   lastPromoShareAt?: string | null
   experience: string
   tools: string[]
+  siteNotes?: string
+  rainObservations?: RainObservation[]
   timeZone: string
   notifMorning: string
   notifEvening: string
   notifLevel: string
   notifChannels: string[]
+  interestingFact: string
+  interestingFactDateKey?: string | null
+  scienceFact: string
+  scienceFactDateKey?: string | null
+  weeklyPlanAccessUntil?: string | null
+  weeklyPlanText?: string
+  weeklyPlanGeneratedAt?: string | null
   subscription?: SubscriptionInfo | null
 }
 
@@ -120,25 +163,4 @@ export interface MoonData {
   age: number
   loading: boolean
   daysUntilFullMoon: number
-}
-
-export interface ForecastDay {
-  date: string
-  temp: number
-  humidity: number
-  description: string
-  icon: string
-}
-
-export interface WeekTask {
-  date: string
-  day: string
-  tasks: string[]
-}
-
-export interface WeekDay {
-  date: string
-  day: string
-  temp: number
-  humidity: number
 }

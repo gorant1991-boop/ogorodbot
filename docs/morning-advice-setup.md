@@ -1,11 +1,13 @@
-# Morning Advice Setup
+# Scheduled Advice Setup
 
 ## Что уже реализовано
 
 - время утренних и вечерних советов хранится в профиле пользователя
 - сохраняется `timeZone` пользователя из браузера
 - серверная функция `generate-morning-advice` создаёт запись в `notifications`
+- функция отправляет и утренние, и вечерние советы в зависимости от текущего окна времени
 - если включён канал `email` и настроены почтовые секреты, функция отправляет письмо
+- GitHub Actions workflow работает через очередь `notification_jobs`: сначала ставит due-советы в очередь, потом вычитывает её батчами
 
 ## Что нужно задеплоить
 
@@ -49,6 +51,9 @@ VK_API_VERSION=5.199
 POST https://<project-ref>.supabase.co/functions/v1/generate-morning-advice
 ```
 
+Этого одного вызова достаточно и для утра, и для вечера: функция сама сверяет `notifMorning` и `notifEvening`.
+Для продового cron в репозитории уже настроен более надёжный вариант: `enqueue -> worker`.
+
 Подходящие варианты:
 
 - GitHub Actions cron
@@ -63,6 +68,8 @@ POST https://<project-ref>.supabase.co/functions/v1/generate-morning-advice
 
 - `MORNING_ADVICE_URL=https://<project-ref>.supabase.co/functions/v1/generate-morning-advice`
 
+И нужна свежая миграция для `notification_jobs.job_key`, чтобы очередь не дублировала задания за один и тот же локальный день.
+
 ## Ручная проверка
 
 Сгенерировать совет для одного пользователя сразу:
@@ -70,7 +77,7 @@ POST https://<project-ref>.supabase.co/functions/v1/generate-morning-advice
 ```bash
 curl -X POST "https://<project-ref>.supabase.co/functions/v1/generate-morning-advice" \
   -H "Content-Type: application/json" \
-  -d '{"targetVkUserId":123456,"force":true}'
+  -d '{"targetVkUserId":123456,"force":true,"adviceKind":"evening"}'
 ```
 
 Сгенерировать совет на тестовое время:

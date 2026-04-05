@@ -9,7 +9,7 @@ jobs:
   trigger:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger morning advice function
+      - name: Enqueue and process scheduled advice
         env:
           MORNING_ADVICE_URL: ${{ secrets.MORNING_ADVICE_URL }}
         run: |
@@ -20,7 +20,36 @@ jobs:
             exit 1
           fi
 
-          curl --fail --show-error --silent \
-            -X POST "$CLEAN_URL" \
-            -H "Content-Type: application/json" \
-            -d '{}'
+          curl_json() {
+            curl --fail --show-error --silent \
+              -X POST "$CLEAN_URL" \
+              -H "Content-Type: application/json" \
+              -d "$1"
+          }
+
+          python_json_field() {
+            python3 -c 'import json, sys; data=json.load(sys.stdin); value=data
+for part in sys.argv[1].split("."):
+    value = value.get(part) if isinstance(value, dict) else None
+print("" if value is None else value)' "$1"
+          }
+
+          ENQUEUE_RESPONSE="$(curl_json '{"mode":"enqueue"}')"
+          echo "$ENQUEUE_RESPONSE"
+
+          MAX_ROUNDS=20
+          BATCH_SIZE=10
+
+          for ROUND in $(seq 1 "$MAX_ROUNDS"); do
+            WORKER_RESPONSE="$(curl_json "{\"mode\":\"worker\",\"batchSize\":$BATCH_SIZE}")"
+            echo "$WORKER_RESPONSE"
+
+            PROCESSED="$(printf '%s' "$WORKER_RESPONSE" | python_json_field processed)"
+            REMAINING="$(printf '%s' "$WORKER_RESPONSE" | python_json_field remaining)"
+
+            if [ "${PROCESSED:-0}" = "0" ] || [ "${REMAINING:-0}" = "0" ]; then
+              break
+            fi
+
+            sleep 2
+          done

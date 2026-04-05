@@ -13,6 +13,13 @@ Deno.serve(async (request) => {
       nowIso: typeof body?.nowIso === 'string' ? body.nowIso : undefined,
       targetVkUserId: Number(body?.targetVkUserId ?? 0) || undefined,
       force: Boolean(body?.force),
+      adviceKind: body?.adviceKind === 'morning' || body?.adviceKind === 'evening'
+        ? body.adviceKind
+        : undefined,
+      mode: body?.mode === 'enqueue' || body?.mode === 'worker' || body?.mode === 'direct'
+        ? body.mode
+        : undefined,
+      batchSize: Number(body?.batchSize ?? 0) || undefined,
     })
   } catch (error) {
     return json({

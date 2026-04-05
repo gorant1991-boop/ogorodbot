@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CropEntry, GardenObject, Plan } from '../../utils/types'
-import { CROPS, CROP_VARIETIES, GROW_OPTIONS, getOps, isPerennial } from '../../utils/constants'
+import { CROPS, CROP_DAYS, CROP_VARIETIES, GROW_OPTIONS, getOps, isPerennial } from '../../utils/constants'
 
 export function CropEditModal({ entry, gardenObjects, onSave, onDelete, onClose, onAddDiary, onAskAi, plan = 'free' as Plan }: {
   entry: CropEntry
@@ -23,6 +23,7 @@ export function CropEditModal({ entry, gardenObjects, onSave, onDelete, onClose,
   const isEnclosed = locObj?.type === 'greenhouse' || locObj?.type === 'hotbed'
   const ops = getOps(e.id)
   const opList = isEnclosed ? [...ops, { id: 'ventilation', label: '🏠 Проветривание' }] : ops
+  const defaultMaturityDays = e.varieties[0]?.days ?? CROP_DAYS[e.id] ?? 90
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -51,7 +52,7 @@ export function CropEditModal({ entry, gardenObjects, onSave, onDelete, onClose,
                 return (
                   <button key={obj.uid} className={`ob-chip ${e.location === obj.uid ? 'selected' : ''}`}
                     onClick={() => upd({ location: obj.uid })}>
-                    {opt.icon} {opt.title}
+                    {opt.icon} {obj.name || opt.title}
                   </button>
                 )
               })}
@@ -76,7 +77,7 @@ export function CropEditModal({ entry, gardenObjects, onSave, onDelete, onClose,
         </div>
         {e.sowMethod === 'seedling' && (
           <div className="ob-hint" style={{ marginTop: -8, marginBottom: 8 }}>
-            💡 Для рассады укажите дату посева семян — так прогресс созревания будет точнее
+            💡 Для рассады можно оставить дату посева или дополнительно указать ниже дату укоренения, чтобы прогресс был точнее
           </div>
         )}
         {perennial && (
@@ -89,6 +90,36 @@ export function CropEditModal({ entry, gardenObjects, onSave, onDelete, onClose,
           </div>
         )}
 
+        {!perennial && (
+          <>
+            <div className="modal-section-label">Точность сроков</div>
+            <div className="ob-sow-row" style={{ marginBottom: 8 }}>
+              <div className="ob-dim-field" style={{ flex: 1 }}>
+                <label>Всходы / укоренение</label>
+                <input
+                  type="date"
+                  value={e.emergenceDate ?? ''}
+                  onChange={ev => upd({ emergenceDate: ev.target.value || undefined })}
+                />
+              </div>
+              <div className="ob-dim-field timing-days-field">
+                <label>До готовности, дней</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={e.maturityDays ?? ''}
+                  onChange={ev => upd({ maturityDays: ev.target.value ? parseInt(ev.target.value, 10) : undefined })}
+                  placeholder={String(defaultMaturityDays)}
+                />
+              </div>
+            </div>
+            <div className="ob-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+              Если указать дату всходов или укоренения, прогресс будет считаться от неё. Поле дней можно оставить пустым: тогда используется срок сорта или культуры.
+            </div>
+          </>
+        )}
+
         <div className="modal-section-label">Сорта</div>
         {e.varieties.map((v, vi) => (
           <div key={vi} className="variety-entry">
@@ -97,7 +128,20 @@ export function CropEditModal({ entry, gardenObjects, onSave, onDelete, onClose,
                 onChange={ev => {
                   const vars = [...e.varieties]; vars[vi] = { ...vars[vi], name: ev.target.value }; upd({ varieties: vars })
                 }} />
-              {v.days && <span className="variety-days-badge">{v.days}д</span>}
+              <input
+                className="ob-variety-days-input"
+                type="number"
+                min="1"
+                max="365"
+                value={v.days ?? ''}
+                onChange={ev => {
+                  const vars = [...e.varieties]
+                  vars[vi] = { ...vars[vi], days: ev.target.value ? parseInt(ev.target.value, 10) : undefined }
+                  upd({ varieties: vars })
+                }}
+                placeholder="дн"
+                aria-label={`Срок сорта ${v.name || vi + 1} в днях`}
+              />
               <button className="ob-variety-del" onClick={() => upd({ varieties: e.varieties.filter((_, i) => i !== vi) })}>✕</button>
             </div>
             <div className="variety-note-row">

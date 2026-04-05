@@ -41,9 +41,45 @@ function initVkConfig(state: string, codeVerifier: string) {
   })
 }
 
+function readStorageValue(key: string) {
+  try {
+    return localStorage.getItem(key) ?? sessionStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function writeStorageValue(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // ignore storage errors
+  }
+
+  try {
+    sessionStorage.setItem(key, value)
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function removeStorageValue(key: string) {
+  try {
+    localStorage.removeItem(key)
+  } catch {
+    // ignore storage errors
+  }
+
+  try {
+    sessionStorage.removeItem(key)
+  } catch {
+    // ignore storage errors
+  }
+}
+
 function loadVkFlows(): Record<string, string> {
   try {
-    const raw = localStorage.getItem(VK_FLOW_STORAGE_KEY)
+    const raw = readStorageValue(VK_FLOW_STORAGE_KEY)
     if (!raw) return {}
     const parsed = JSON.parse(raw) as Record<string, string>
     if (!parsed || typeof parsed !== 'object') return {}
@@ -56,7 +92,7 @@ function loadVkFlows(): Record<string, string> {
 function saveVkFlowState(state: string, codeVerifier: string) {
   const flows = loadVkFlows()
   flows[state] = codeVerifier
-  localStorage.setItem(VK_FLOW_STORAGE_KEY, JSON.stringify(flows))
+  writeStorageValue(VK_FLOW_STORAGE_KEY, JSON.stringify(flows))
 }
 
 function loadVkFlowState(state: string) {
@@ -69,17 +105,17 @@ function loadVkFlowState(state: string) {
 
 function clearVkFlowState(state?: string) {
   if (!state) {
-    localStorage.removeItem(VK_FLOW_STORAGE_KEY)
+    removeStorageValue(VK_FLOW_STORAGE_KEY)
     return
   }
 
   const flows = loadVkFlows()
   delete flows[state]
   if (Object.keys(flows).length === 0) {
-    localStorage.removeItem(VK_FLOW_STORAGE_KEY)
+    removeStorageValue(VK_FLOW_STORAGE_KEY)
     return
   }
-  localStorage.setItem(VK_FLOW_STORAGE_KEY, JSON.stringify(flows))
+  writeStorageValue(VK_FLOW_STORAGE_KEY, JSON.stringify(flows))
 }
 
 export function getVkAppId() {

@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { deleteAccount } from '../../supabase'
 
-export function DeleteAccountButton({ vkUserId }: { vkUserId: number }) {
+export function DeleteAccountButton({ vkUserId, onDeleted }: { vkUserId: number; onDeleted?: () => void }) {
   const [confirm, setConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -19,15 +20,13 @@ export function DeleteAccountButton({ vkUserId }: { vkUserId: number }) {
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={async () => {
           setDeleting(true)
-          try {
-            await fetch('https://garden-agent.gorant1991.workers.dev/delete-account', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ vk_user_id: vkUserId }),
-            })
-          } catch {
-            // ignore delete errors before reload
+          const deleted = await deleteAccount(vkUserId)
+          if (!deleted) {
+            setDeleting(false)
+            window.alert('Не удалось удалить аккаунт. Попробуйте ещё раз.')
+            return
           }
+          onDeleted?.()
           window.location.reload()
         }} style={{ flex: 1, background: 'rgba(239,68,68,0.7)', border: 'none', borderRadius: 10, padding: '10px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
           Да, удалить всё

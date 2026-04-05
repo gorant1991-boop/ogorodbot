@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client'
 import bridge from '@vkontakte/vk-bridge'
 import './index.css'
 import App from './App.tsx'
+import { detectEmbeddedBrowser } from './utils/browser'
+import { initWebAnalytics } from './utils/webAnalytics'
 
 declare global {
   interface Window {
@@ -14,7 +16,9 @@ async function initVkBridge() {
   try {
     await bridge.send('VKWebAppInit')
   } catch (e) {
-    console.log('bridge error', e)
+    if (import.meta.env.DEV) {
+      console.error('bridge init error', e)
+    }
   }
 }
 
@@ -45,6 +49,17 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
 }
 
 void initVkBridge()
+initWebAnalytics()
+
+if ('serviceWorker' in navigator && !detectEmbeddedBrowser()) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js').catch(error => {
+      if (import.meta.env.DEV) {
+        console.error('service worker register error', error)
+      }
+    })
+  })
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

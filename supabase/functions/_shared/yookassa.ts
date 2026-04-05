@@ -2,17 +2,20 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 type Plan = 'base' | 'pro'
 type BillingPeriod = 'monthly' | 'seasonal'
+type OfferKind = 'subscription' | 'weekly_plan'
 
-interface SubscriptionOffer {
+interface CheckoutOffer {
   id: string
-  level: Plan
-  period: BillingPeriod
+  kind: OfferKind
+  level?: Plan
+  period?: BillingPeriod
   title: string
   amount: number
   baseAmount: number
   discountPercent: number
   endsAt: string
-  monthlyPrice: number
+  days: number
+  monthlyPrice?: number
 }
 
 interface YooKassaPayment {
@@ -44,64 +47,54 @@ export function handleCors(request: Request) {
   return null
 }
 
-function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-
-function getSeasonEndDate(now: Date): Date {
-  const year = now.getFullYear()
-  const seasonEnd = new Date(year, 9, 31, 23, 59, 59, 999)
-  if (now <= seasonEnd) return seasonEnd
-  return new Date(year + 1, 9, 31, 23, 59, 59, 999)
-}
-
 function addDays(date: Date, days: number): Date {
   const next = new Date(date)
   next.setDate(next.getDate() + days)
   return next
 }
 
-function diffDaysInclusive(from: Date, to: Date): number {
-  const start = startOfDay(from).getTime()
-  const end = startOfDay(to).getTime()
-  return Math.max(1, Math.ceil((end - start) / 86400000) + 1)
+function extendWeeklyPlanAccess(currentAccessUntil: unknown, paidAtIso: string, days: number) {
+  const paidAt = new Date(paidAtIso)
+  const currentDate = typeof currentAccessUntil === 'string' ? new Date(currentAccessUntil) : null
+  const currentTime = currentDate?.getTime() ?? Number.NaN
+  const base = Number.isFinite(currentTime) && currentTime > paidAt.getTime()
+    ? currentDate as Date
+    : paidAt
+
+  return addDays(base, days).toISOString()
 }
 
-function buildOffers(now = new Date()): Record<string, SubscriptionOffer> {
-  const seasonEnd = getSeasonEndDate(now)
+function buildOffers(now = new Date()): Record<string, CheckoutOffer> {
   const monthlyPrices: Record<Plan, number> = { base: 150, pro: 300 }
-  const offers: SubscriptionOffer[] = (['base', 'pro'] as Plan[]).flatMap(level => {
+  const offers: CheckoutOffer[] = (['base', 'pro'] as Plan[]).map(level => {
     const monthlyPrice = monthlyPrices[level]
     const monthlyEndsAt = addDays(now, 30)
-    const seasonDays = diffDaysInclusive(now, seasonEnd)
-    const seasonBaseAmount = Math.ceil((monthlyPrice / 30) * seasonDays)
-    const seasonAmount = Math.ceil(seasonBaseAmount * 0.8)
     const planTitle = level === 'base' ? 'Базовая' : 'Про'
 
-    return [
-      {
-        id: `${level}-monthly`,
-        level,
-        period: 'monthly',
-        title: `${planTitle} на месяц`,
-        amount: monthlyPrice,
-        baseAmount: monthlyPrice,
-        discountPercent: 0,
-        endsAt: monthlyEndsAt.toISOString(),
-        monthlyPrice,
-      },
-      {
-        id: `${level}-seasonal`,
-        level,
-        period: 'seasonal',
-        title: `${planTitle} на сезон`,
-        amount: seasonAmount,
-        baseAmount: seasonBaseAmount,
-        discountPercent: 20,
-        endsAt: seasonEnd.toISOString(),
-        monthlyPrice,
-      },
-    ]
+    return {
+      id: `${level}-monthly`,
+      kind: 'subscription',
+      level,
+      period: 'monthly',
+      title: `${planTitle} на месяц`,
+      amount: monthlyPrice,
+      baseAmount: monthlyPrice,
+      discountPercent: 0,
+      endsAt: monthlyEndsAt.toISOString(),
+      days: 30,
+      monthlyPrice,
+    }
+  })
+
+  offers.unshift({
+    id: 'weekly-plan-7d',
+    kind: 'weekly_plan',
+    title: 'План на 7 дней',
+    amount: 99,
+    baseAmount: 99,
+    discountPercent: 0,
+    endsAt: addDays(now, 7).toISOString(),
+    days: 7,
   })
 
   return Object.fromEntries(offers.map(offer => [offer.id, offer]))
@@ -166,6 +159,44 @@ async function upsertBillingPayment(admin: ReturnType<typeof getAdminClient>, pa
   if (error) throw error
 }
 
+function buildSubscriptionFromOffer(params: {
+  offer: CheckoutOffer
+  currentSubscription: unknown
+  paidAtIso: string
+  fallbackAmount: number
+}) {
+  const { offer, currentSubscription, paidAtIso, fallbackAmount } = params
+  if (offer.kind !== 'subscription' || !offer.level || !offer.period) {
+    throw new Error('Некорректный оффер подписки')
+  }
+
+  const paidAt = new Date(paidAtIso)
+  const rawCurrent = typeof currentSubscription === 'object' && currentSubscription
+    ? currentSubscription as Record<string, unknown>
+    : null
+  const currentEndsAt = typeof rawCurrent?.endsAt === 'string'
+    ? new Date(rawCurrent.endsAt)
+    : null
+  const currentEndsAtMs = currentEndsAt?.getTime() ?? Number.NaN
+  const baseDate = Number.isFinite(currentEndsAtMs) && currentEndsAtMs > paidAt.getTime()
+    ? currentEndsAt as Date
+    : paidAt
+  const nextEndsAt = addDays(baseDate, offer.days).toISOString()
+
+  return {
+    level: offer.level,
+    period: offer.period,
+    status: 'active' as const,
+    startsAt: paidAt.toISOString(),
+    endsAt: nextEndsAt,
+    monthlyPrice: offer.monthlyPrice ?? offer.amount,
+    amount: offer.amount || fallbackAmount,
+    baseAmount: offer.baseAmount || fallbackAmount,
+    discountPercent: offer.discountPercent,
+    source: 'yookassa' as const,
+  }
+}
+
 export async function createEmbeddedPayment(input: { offerId: string; vkUserId: number }) {
   const offers = buildOffers()
   const offer = offers[input.offerId]
@@ -177,11 +208,12 @@ export async function createEmbeddedPayment(input: { offerId: string; vkUserId: 
 
   const metadata = {
     offer_id: offer.id,
+    offer_kind: offer.kind,
     vk_user_id: String(input.vkUserId),
-    subscription_level: offer.level,
-    subscription_period: offer.period,
+    subscription_level: offer.level ?? '',
+    subscription_period: offer.period ?? '',
     subscription_ends_at: offer.endsAt,
-    monthly_price: String(offer.monthlyPrice),
+    monthly_price: String(offer.monthlyPrice ?? 0),
     base_amount: String(offer.baseAmount),
     amount: String(offer.amount),
     discount_percent: String(offer.discountPercent),
@@ -194,7 +226,7 @@ export async function createEmbeddedPayment(input: { offerId: string; vkUserId: 
       amount: { value: offer.amount.toFixed(2), currency: 'RUB' },
       capture: true,
       save_payment_method: enableRecurring,
-      description: `ОгородБот — ${offer.title}`,
+      description: `МойАгроном — ${offer.title}`,
       confirmation: { type: 'embedded' },
       metadata,
     }),
@@ -202,9 +234,14 @@ export async function createEmbeddedPayment(input: { offerId: string; vkUserId: 
 
   await upsertBillingPayment(admin, payment)
 
+  const confirmationToken = payment.confirmation?.confirmation_token
+  if (!confirmationToken) {
+    throw new Error('ЮKassa не вернула confirmation_token для embedded checkout')
+  }
+
   return json({
     paymentId: payment.id,
-    confirmationToken: payment.confirmation?.confirmation_token,
+    confirmationToken,
     amount: offer.amount,
     currency: 'RUB',
     title: offer.title,
@@ -230,23 +267,15 @@ export async function applySuccessfulPayment(payment: YooKassaPayment) {
   const vkUserId = Number(metadata.vk_user_id ?? 0)
   if (!vkUserId) throw new Error('Платёж не привязан к пользователю')
 
-  const subscription = {
-    level: metadata.subscription_level as Plan,
-    period: metadata.subscription_period as BillingPeriod,
-    status: 'active' as const,
-    startsAt: payment.paid_at ?? payment.created_at ?? new Date().toISOString(),
-    endsAt: metadata.subscription_ends_at,
-    monthlyPrice: Number(metadata.monthly_price ?? 0),
-    amount: Number(metadata.amount ?? payment.amount?.value ?? 0),
-    baseAmount: Number(metadata.base_amount ?? payment.amount?.value ?? 0),
-    discountPercent: Number(metadata.discount_percent ?? 0),
-    source: 'yookassa' as const,
-  }
+  const paidAt = payment.paid_at ?? payment.created_at ?? new Date().toISOString()
+  const offerKind = (metadata.offer_kind ?? 'subscription') as OfferKind
+  const offers = buildOffers(new Date(paidAt))
+  const offer = offers[metadata.offer_id ?? '']
 
   if (!billingRow?.applied_at) {
     const { data: existingGarden, error: gardenError } = await admin
       .from('garden_data')
-      .select('onboarding')
+      .select('onboarding, plan')
       .eq('vk_user_id', vkUserId)
       .maybeSingle()
     if (gardenError) throw gardenError
@@ -254,33 +283,98 @@ export async function applySuccessfulPayment(payment: YooKassaPayment) {
     const onboarding = typeof existingGarden?.onboarding === 'object' && existingGarden?.onboarding
       ? { ...(existingGarden.onboarding as Record<string, unknown>) }
       : {}
-    onboarding.subscription = subscription
+    let onboardingPatch: Record<string, unknown> | null = null
+    const subscription = offerKind === 'subscription' && offer
+      ? buildSubscriptionFromOffer({
+          offer,
+          currentSubscription: onboarding.subscription,
+          paidAtIso: paidAt,
+          fallbackAmount: Number(payment.amount?.value ?? 0),
+        })
+      : null
+
+    if (subscription) {
+      onboarding.subscription = subscription
+    } else if (offerKind === 'weekly_plan') {
+      const nextAccessUntil = extendWeeklyPlanAccess(onboarding.weeklyPlanAccessUntil, paidAt, 7)
+      onboarding.weeklyPlanAccessUntil = nextAccessUntil
+      onboardingPatch = { weeklyPlanAccessUntil: nextAccessUntil }
+    }
 
     const { error: upsertGardenError } = await admin
       .from('garden_data')
       .upsert({
         vk_user_id: vkUserId,
         onboarding,
-        plan: subscription.level,
+        plan: subscription?.level ?? (existingGarden?.plan ?? 'free'),
       }, {
         onConflict: 'vk_user_id',
       })
     if (upsertGardenError) throw upsertGardenError
 
+    const weeklyPlanEndsAt = onboardingPatch?.weeklyPlanAccessUntil ?? metadata.subscription_ends_at
     await admin.from('notifications').insert({
       vk_user_id: vkUserId,
-      type: 'subscription',
-      title: 'Подписка активирована',
-      body: `${metadata.title ?? 'Подписка'} оплачена и активна до ${new Date(subscription.endsAt).toLocaleDateString('ru-RU')}.`,
+      type: subscription ? 'subscription' : 'weekly_plan_access',
+      title: subscription ? 'Подписка активирована' : 'План на 7 дней активирован',
+      body: subscription
+        ? `${metadata.title ?? 'Подписка'} оплачена и активна до ${new Date(subscription.endsAt).toLocaleDateString('ru-RU')}.`
+        : `${metadata.title ?? 'План на 7 дней'} оплачен и доступен до ${new Date(String(weeklyPlanEndsAt)).toLocaleDateString('ru-RU')}.`,
     })
 
     await admin
       .from('billing_payments')
       .update({ applied_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('provider_payment_id', payment.id)
+
+    return {
+      subscription,
+      onboardingPatch,
+      offerId: metadata.offer_id ?? null,
+    }
   }
 
-  return subscription
+  let subscription = null
+  if (offerKind === 'subscription' && offer) {
+    const { data: currentGarden } = await admin
+      .from('garden_data')
+      .select('onboarding')
+      .eq('vk_user_id', vkUserId)
+      .maybeSingle()
+
+    const currentOnboarding = currentGarden?.onboarding as Record<string, unknown> | null
+    const currentSubscription = currentOnboarding?.subscription
+    subscription = currentSubscription && typeof currentSubscription === 'object'
+      ? currentSubscription
+      : buildSubscriptionFromOffer({
+          offer,
+          currentSubscription: null,
+          paidAtIso: paidAt,
+          fallbackAmount: Number(payment.amount?.value ?? 0),
+        })
+  }
+  let onboardingPatch: Record<string, unknown> | null = null
+  if (offerKind === 'weekly_plan') {
+    const { data: currentGarden } = await admin
+      .from('garden_data')
+      .select('onboarding')
+      .eq('vk_user_id', vkUserId)
+      .maybeSingle()
+
+    const currentOnboarding = currentGarden?.onboarding as Record<string, unknown> | null
+    const currentAccessUntil = typeof currentOnboarding?.weeklyPlanAccessUntil === 'string'
+      ? currentOnboarding.weeklyPlanAccessUntil
+      : null
+    if (currentAccessUntil) {
+      onboardingPatch = { weeklyPlanAccessUntil: currentAccessUntil }
+    }
+  }
+
+  return {
+    subscription,
+    onboardingPatch,
+    offerId: metadata.offer_id ?? null,
+  }
 }
 
 export { json }

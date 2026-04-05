@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>МойАгроном — Сегодня в огороде</title>
+    <style>
+      :root {
+        --bg-top: #102217;
+        --bg-bottom: #07120c;
+        --glass: rgba(255, 255, 255, 0.08);
+        --glass-strong: rgba(255, 255, 255, 0.12);
+        --line: rgba(255, 255, 255, 0.12);
+        --text: #f6fff7;
+        --muted: rgba(240, 255, 244, 0.66);
+        --green: #4ade80;
+        --green-deep: #16a34a;
+        --warm: #f5b942;
+        --warm-soft: rgba(245, 185, 66, 0.18);
+        --blue: #7dd3fc;
+        --blue-soft: rgba(125, 211, 252, 0.18);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 1080px;
+        height: 1350px;
+        overflow: hidden;
+        font-family: "Nunito", "SF Pro Display", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 18% 16%, rgba(74, 222, 128, 0.18), transparent 28%),
+          radial-gradient(circle at 86% 20%, rgba(125, 211, 252, 0.12), transparent 24%),
+          radial-gradient(circle at 80% 86%, rgba(74, 222, 128, 0.12), transparent 26%),
+          linear-gradient(180deg, #142c1e 0%, #0a140e 100%);
+        color: var(--text);
+      }
+
+      body::before,
+      body::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        filter: blur(10px);
+        opacity: 0.45;
+      }
+
+      body::before {
+        width: 320px;
+        height: 320px;
+        top: 90px;
+        left: -70px;
+        background: radial-gradient(circle, rgba(74, 222, 128, 0.28), transparent 68%);
+      }
+
+      body::after {
+        width: 420px;
+        height: 420px;
+        right: -90px;
+        bottom: 100px;
+        background: radial-gradient(circle, rgba(125, 211, 252, 0.12), transparent 72%);
+      }
+
+      .canvas {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        padding: 88px 74px 72px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(10px);
+      }
+
+      .brand-badge {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, #4ade80, #15803d);
+        box-shadow: 0 12px 24px rgba(22, 163, 74, 0.35);
+        font-size: 18px;
+      }
+
+      .brand-name {
+        font-size: 24px;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+      }
+
+      .hero {
+        margin-top: 36px;
+        display: grid;
+        grid-template-columns: 1.02fr 0.98fr;
+        gap: 34px;
+        align-items: center;
+      }
+
+      .copy {
+        padding-right: 10px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 14px;
+        border-radius: 999px;
+        background: rgba(74, 222, 128, 0.08);
+        border: 1px solid rgba(74, 222, 128, 0.18);
+        color: #d8ffe3;
+        font-size: 16px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      h1 {
+        margin: 20px 0 18px;
+        font-size: 78px;
+        line-height: 0.94;
+        font-weight: 900;
+        letter-spacing: -0.04em;
+        text-wrap: balance;
+      }
+
+      .lead {
+        max-width: 450px;
+        font-size: 29px;
+        line-height: 1.3;
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .chips {
+        margin-top: 28px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        max-width: 470px;
+      }
+
+      .chip {
+        padding: 12px 16px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: rgba(248, 255, 249, 0.9);
+        font-size: 18px;
+        font-weight: 800;
+      }
+
+      .cta {
+        margin-top: 34px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 280px;
+        padding: 19px 28px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, var(--green), var(--green-deep));
+        box-shadow: 0 20px 36px rgba(22, 163, 74, 0.34);
+        color: white;
+        font-size: 29px;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+      }
+
+      .phone-wrap {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .phone-glow {
+        position: absolute;
+        inset: auto;
+        width: 520px;
+        height: 520px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(74, 222, 128, 0.22), transparent 70%);
+        filter: blur(18px);
+      }
+
+      .phone {
+        position: relative;
+        width: 430px;
+        height: 880px;
+        padding: 16px;
+        border-radius: 50px;
+        background: linear-gradient(180deg, #1f1f1f, #080808 60%, #000);
+        box-shadow:
+          0 28px 70px rgba(0, 0, 0, 0.55),
+          inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      }
+
+      .phone::before {
+        content: "";
+        position: absolute;
+        inset: 8px;
+        border-radius: 42px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .notch {
+        position: absolute;
+        top: 18px;
+        left: 50%;
+        width: 132px;
+        height: 30px;
+        transform: translateX(-50%);
+        border-radius: 20px;
+        background: #030303;
+        z-index: 3;
+      }
+
+      .screen {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border-radius: 36px;
+        background:
+          radial-gradient(circle at top left, rgba(88, 255, 155, 0.12), transparent 28%),
+          linear-gradient(180deg, rgba(12, 30, 20, 0.96) 0%, rgba(8, 20, 14, 0.98) 100%);
+      }
+
+      .screen::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 22%),
+          radial-gradient(circle at 78% 14%, rgba(74, 222, 128, 0.12), transparent 26%);
+        pointer-events: none;
+      }
+
+      .statusbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 18px 22px 6px;
+        color: rgba(255, 255, 255, 0.86);
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .status-icons {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+      }
+
+      .status-pill {
+        width: 20px;
+        height: 10px;
+        border-radius: 4px;
+        border: 1.5px solid rgba(255, 255, 255, 0.7);
+      }
+
+      .app-content {
+        padding: 10px 16px 18px;
+      }
+
+      .app-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 8px 12px;
+      }
+
+      .greeting {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.48);
+        font-weight: 700;
+      }
+
+      .date {
+        margin-top: 4px;
+        font-size: 22px;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+      }
+
+      .moon {
+        width: 46px;
+        height: 46px;
+        border-radius: 16px;
+        display: grid;
+        place-items: center;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 20px;
+      }
+
+      .section-title {
+        margin: 6px 8px 12px;
+        font-size: 17px;
+        font-weight: 900;
+        letter-spacing: -0.01em;
+      }
+
+      .today-card {
+        margin: 0 6px 12px;
+        padding: 18px;
+        border-radius: 24px;
+        background: linear-gradient(135deg, rgba(40, 76, 56, 0.96), rgba(17, 43, 28, 0.92));
+        border: 1px solid rgba(120, 255, 180, 0.16);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      }
+
+      .today-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .today-label {
+        font-size: 14px;
+        font-weight: 900;
+      }
+
+      .today-sub {
+        margin-top: 8px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: rgba(235, 255, 241, 0.72);
+      }
+
+      .progress {
+        min-width: 88px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.06);
+        padding: 12px 10px;
+        text-align: center;
+      }
+
+      .progress-value {
+        font-size: 28px;
+        font-weight: 900;
+        line-height: 1;
+        color: #bcffd1;
+      }
+
+      .progress-label {
+        margin-top: 6px;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        color: rgba(255, 255, 255, 0.52);
+        text-transform: uppercase;
+        font-weight: 800;
+      }
+
+      .risks {
+        margin-top: 14px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .risk {
+        padding: 7px 11px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .risk.warm {
+        background: var(--warm-soft);
+        color: #ffe8b3;
+        border: 1px solid rgba(245, 185, 66, 0.18);
+      }
+
+      .risk.blue {
+        background: var(--blue-soft);
+        color: #d9f4ff;
+        border: 1px solid rgba(125, 211, 252, 0.18);
+      }
+
+      .list {
+        display: grid;
+        gap: 10px;
+        margin: 0 6px;
+      }
+
+      .task {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 13px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .task.done {
+        background: rgba(74, 222, 128, 0.08);
+        border-color: rgba(74, 222, 128, 0.2);
+      }
+
+      .task-icon {
+        font-size: 26px;
+        width: 34px;
+        text-align: center;
+      }
+
+      .task-main {
+        flex: 1;
+      }
+
+      .task-name {
+        font-size: 15px;
+        font-weight: 900;
+      }
+
+      .task-sub {
+        margin-top: 4px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.62);
+        font-weight: 700;
+      }
+
+      .task-btn {
+        min-width: 88px;
+        text-align: center;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(74, 222, 128, 0.14);
+        border: 1px solid rgba(74, 222, 128, 0.3);
+        color: var(--green);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .task.done .task-btn {
+        background: rgba(74, 222, 128, 0.22);
+        color: #dcfce7;
+      }
+
+      .mini-card {
+        margin: 16px 6px 0;
+        padding: 14px 15px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, rgba(18, 54, 67, 0.9), rgba(12, 29, 40, 0.88));
+        border: 1px solid rgba(96, 165, 250, 0.14);
+      }
+
+      .mini-label {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 800;
+      }
+
+      .mini-title {
+        margin-top: 8px;
+        font-size: 18px;
+        line-height: 1.18;
+        font-weight: 900;
+      }
+
+      .mini-body {
+        margin-top: 7px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: rgba(255, 255, 255, 0.68);
+      }
+
+      .bottom-nav {
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        bottom: 16px;
+        border-radius: 24px;
+        padding: 10px 8px 12px;
+        background: rgba(8, 17, 12, 0.94);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 4px;
+      }
+
+      .nav-item {
+        display: grid;
+        justify-items: center;
+        gap: 3px;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 10px;
+        font-weight: 800;
+      }
+
+      .nav-item.active {
+        color: #d9ffe5;
+      }
+
+      .nav-icon {
+        font-size: 20px;
+      }
+
+      .side-note {
+        position: absolute;
+        right: 22px;
+        top: 150px;
+        width: 126px;
+        padding: 14px 14px 16px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 18px 36px rgba(0, 0, 0, 0.22);
+      }
+
+      .side-note-title {
+        font-size: 14px;
+        font-weight: 900;
+        line-height: 1.15;
+      }
+
+      .side-note-body {
+        margin-top: 6px;
+        font-size: 12px;
+        line-height: 1.45;
+        color: rgba(255, 255, 255, 0.62);
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="canvas">
+      <div class="brand">
+        <div class="brand-badge">🌱</div>
+        <div class="brand-name">МойАгроном</div>
+      </div>
+
+      <div class="hero">
+        <div class="copy">
+          <div class="eyebrow">Сегодня в огороде</div>
+          <h1>Что проверить и сделать прямо сегодня</h1>
+          <div class="lead">
+            Понятный план на день по вашим культурам, погоде и уже отмеченному уходу.
+          </div>
+          <div class="chips">
+            <div class="chip">План на день</div>
+            <div class="chip">Под ваши культуры</div>
+            <div class="chip">Без лишней воды</div>
+          </div>
+          <div class="cta">Открыть бесплатно</div>
+        </div>
+
+        <div class="phone-wrap">
+          <div class="phone-glow"></div>
+          <div class="side-note">
+            <div class="side-note-title">Не список “на всякий случай”</div>
+            <div class="side-note-body">Только то, что реально актуально для вашего участка сегодня.</div>
+          </div>
+          <div class="phone">
+            <div class="notch"></div>
+            <div class="screen">
+              <div class="statusbar">
+                <div>09:12</div>
+                <div class="status-icons">
+                  <div>4G</div>
+                  <div>📶</div>
+                  <div class="status-pill"></div>
+                </div>
+              </div>
+
+              <div class="app-content">
+                <div class="app-header">
+                  <div>
+                    <div class="greeting">Доброе утро, Антон</div>
+                    <div class="date">3 апреля, пятница</div>
+                  </div>
+                  <div class="moon">🌙</div>
+                </div>
+
+                <div class="section-title">Сегодня в огороде</div>
+
+                <div class="today-card">
+                  <div class="today-top">
+                    <div>
+                      <div class="today-label">План на день</div>
+                      <div class="today-sub">
+                        Короткий список дел по вашим культурам. Отмечайте выполненное, чтобы советы становились точнее.
+                      </div>
+                    </div>
+                    <div class="progress">
+                      <div class="progress-value">2/5</div>
+                      <div class="progress-label">выполнено</div>
+                    </div>
+                  </div>
+                  <div class="risks">
+                    <div class="risk warm">Жарко после 14:00</div>
+                    <div class="risk blue">Проверить влажность</div>
+                  </div>
+                </div>
+
+                <div class="list">
+                  <div class="task">
+                    <div class="task-icon">🍅</div>
+                    <div class="task-main">
+                      <div class="task-name">Томаты</div>
+                      <div class="task-sub">💧 Полив под корень · теплица</div>
+                    </div>
+                    <div class="task-btn">Отметить</div>
+                  </div>
+
+                  <div class="task done">
+                    <div class="task-icon">🥒</div>
+                    <div class="task-main">
+                      <div class="task-name">Огурцы</div>
+                      <div class="task-sub">🪢 Подвязка · уже закрыто сегодня</div>
+                    </div>
+                    <div class="task-btn">Готово</div>
+                  </div>
+
+                  <div class="task">
+                    <div class="task-icon">🌿</div>
+                    <div class="task-main">
+                      <div class="task-name">Базилик</div>
+                      <div class="task-sub">✂️ Прищипнуть верхушки · грядка у дома</div>
+                    </div>
+                    <div class="task-btn">Отметить</div>
+                  </div>
+                </div>
+
+                <div class="mini-card">
+                  <div class="mini-label">Пульс недели</div>
+                  <div class="mini-title">Вы уже держите ритм сезона</div>
+                  <div class="mini-body">
+                    4 дня с активностью, 7 записей в дневнике и 3 культуры под регулярным уходом.
+                  </div>
+                </div>
+              </div>
+
+              <div class="bottom-nav">
+                <div class="nav-item active">
+                  <div class="nav-icon">🏠</div>
+                  <div>Главная</div>
+                </div>
+                <div class="nav-item">
+                  <div class="nav-icon">🌱</div>
+                  <div>Растения</div>
+                </div>
+                <div class="nav-item">
+                  <div class="nav-icon">📖</div>
+                  <div>Дневник</div>
+                </div>
+                <div class="nav-item">
+                  <div class="nav-icon">🌙</div>
+                  <div>Луна</div>
+                </div>
+                <div class="nav-item">
+                  <div class="nav-icon">👤</div>
+                  <div>Профиль</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

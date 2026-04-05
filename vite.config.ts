@@ -1,7 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import legacy from '@vitejs/plugin-legacy'
-import { rmSync } from 'node:fs'
 
 export default defineConfig({
   plugins: [
@@ -11,18 +10,9 @@ export default defineConfig({
       modernPolyfills: true,
       renderLegacyChunks: true,
     }),
-    {
-      name: 'remove-icons-from-dist',
-      closeBundle() {
-        rmSync('dist/icons', { recursive: true, force: true })
-      },
-    },
   ],
   base: '/',
   build: {
-    // Keep the bundle compatible with older mobile browsers that support ESM
-    // but can still choke on newer syntax left in the default target.
-    target: ['chrome61', 'edge79', 'firefox67', 'safari12'],
     cssTarget: ['chrome61', 'safari12'],
   },
 })

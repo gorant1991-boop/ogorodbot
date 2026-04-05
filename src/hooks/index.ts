@@ -1,4 +1,4 @@
-export { useWeather } from './useWeather'
+export { useWeather, fetchWeatherSnapshot } from './useWeather'
 export { useMoon } from './useMoon'
-export { useForecast, type ForecastDay } from './useForecast'
-export { useWeeklyPlan, type WeekTask, type WeekDay } from './useWeeklyPlan'
+export { useForecast, fetchForecastSnapshot, type WeatherForecastDay } from './useForecast'
+export { useWeeklyPlan, fetchWeeklyPlanSnapshot, type WeekTask, type WeekDay } from './useWeeklyPlan'

@@ -1,5 +1,5 @@
 interface YooMoneyCheckoutWidgetInstance {
-  render: (target: string | HTMLElement) => void
+  render: (targetId: string) => void
   destroy?: () => void
 }
 

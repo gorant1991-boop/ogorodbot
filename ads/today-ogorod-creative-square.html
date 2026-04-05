@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>МойАгроном — Сегодня в огороде</title>
+    <style>
+      :root {
+        --bg-1: #102218;
+        --bg-2: #08110c;
+        --card: rgba(255, 255, 255, 0.08);
+        --line: rgba(255, 255, 255, 0.12);
+        --text: #f5fff7;
+        --muted: rgba(240, 255, 244, 0.72);
+        --green: #52df83;
+        --green-deep: #16984b;
+        --blue: #95dfff;
+        --warm: #ffd37b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 600px;
+        height: 600px;
+        overflow: hidden;
+        font-family: "Nunito", "SF Pro Display", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 20% 16%, rgba(82, 223, 131, 0.18), transparent 26%),
+          radial-gradient(circle at 88% 18%, rgba(149, 223, 255, 0.12), transparent 24%),
+          radial-gradient(circle at 78% 84%, rgba(82, 223, 131, 0.12), transparent 28%),
+          linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
+        color: var(--text);
+      }
+
+      body::before,
+      body::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        filter: blur(18px);
+        opacity: 0.5;
+      }
+
+      body::before {
+        width: 200px;
+        height: 200px;
+        top: -40px;
+        left: -60px;
+        background: radial-gradient(circle, rgba(82, 223, 131, 0.32), transparent 68%);
+      }
+
+      body::after {
+        width: 220px;
+        height: 220px;
+        right: -60px;
+        bottom: -30px;
+        background: radial-gradient(circle, rgba(149, 223, 255, 0.16), transparent 70%);
+      }
+
+      .canvas {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        padding: 28px 26px;
+        display: grid;
+        grid-template-columns: 270px 1fr;
+        gap: 18px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(10px);
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .brand-badge {
+        width: 24px;
+        height: 24px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: linear-gradient(135deg, var(--green), var(--green-deep));
+        box-shadow: 0 8px 18px rgba(22, 152, 75, 0.32);
+      }
+
+      .left {
+        position: relative;
+        z-index: 2;
+      }
+
+      .eyebrow {
+        margin-top: 22px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        background: rgba(82, 223, 131, 0.08);
+        border: 1px solid rgba(82, 223, 131, 0.18);
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      h1 {
+        margin: 16px 0 0;
+        font-size: 54px;
+        line-height: 0.92;
+        letter-spacing: -0.05em;
+        font-weight: 900;
+      }
+
+      .lead {
+        margin-top: 16px;
+        max-width: 240px;
+        font-size: 20px;
+        line-height: 1.18;
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .benefits {
+        margin-top: 18px;
+        display: grid;
+        gap: 9px;
+      }
+
+      .benefit {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 12px;
+        border-radius: 15px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 14px;
+        font-weight: 800;
+        color: rgba(245, 255, 247, 0.92);
+      }
+
+      .benefit-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #84f5aa, #41c46f);
+        box-shadow: 0 0 0 5px rgba(82, 223, 131, 0.12);
+        flex: none;
+      }
+
+      .cta {
+        margin-top: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 216px;
+        padding: 16px 20px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, var(--green), var(--green-deep));
+        box-shadow: 0 18px 30px rgba(22, 152, 75, 0.34);
+        font-size: 23px;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+      }
+
+      .phone-stage {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .phone-glow {
+        position: absolute;
+        width: 290px;
+        height: 290px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(82, 223, 131, 0.24), transparent 70%);
+        filter: blur(14px);
+      }
+
+      .phone {
+        position: absolute;
+        right: -18px;
+        top: 18px;
+        width: 270px;
+        height: 548px;
+        padding: 11px;
+        border-radius: 34px;
+        background: linear-gradient(180deg, #1a1a1a, #050505 64%, #000);
+        box-shadow:
+          0 22px 60px rgba(0, 0, 0, 0.52),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        transform: rotate(5deg);
+      }
+
+      .phone::before {
+        content: "";
+        position: absolute;
+        inset: 6px;
+        border-radius: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .notch {
+        position: absolute;
+        top: 14px;
+        left: 50%;
+        width: 88px;
+        height: 20px;
+        transform: translateX(-50%);
+        background: #050505;
+        border-radius: 20px;
+        z-index: 2;
+      }
+
+      .screen {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border-radius: 24px;
+        background:
+          radial-gradient(circle at top left, rgba(88, 255, 155, 0.1), transparent 30%),
+          linear-gradient(180deg, rgba(12, 30, 20, 0.97) 0%, rgba(8, 20, 14, 0.99) 100%);
+      }
+
+      .statusbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 16px 6px;
+        font-size: 11px;
+        font-weight: 800;
+        color: rgba(255, 255, 255, 0.86);
+      }
+
+      .app {
+        padding: 8px 12px 14px;
+      }
+
+      .topline {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.48);
+        font-weight: 700;
+      }
+
+      .title-row {
+        margin-top: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .date {
+        font-size: 18px;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+      }
+
+      .moon {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 16px;
+      }
+
+      .section {
+        margin-top: 14px;
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .today-card {
+        margin-top: 8px;
+        padding: 14px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(39, 77, 56, 0.96), rgba(16, 43, 28, 0.92));
+        border: 1px solid rgba(120, 255, 180, 0.15);
+      }
+
+      .today-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .today-label {
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .today-sub {
+        margin-top: 6px;
+        font-size: 11px;
+        line-height: 1.4;
+        color: rgba(235, 255, 241, 0.72);
+      }
+
+      .progress {
+        min-width: 62px;
+        padding: 10px 8px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: center;
+      }
+
+      .progress-value {
+        font-size: 22px;
+        line-height: 1;
+        color: #bcffd1;
+        font-weight: 900;
+      }
+
+      .progress-label {
+        margin-top: 5px;
+        font-size: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(255, 255, 255, 0.5);
+        font-weight: 800;
+      }
+
+      .chips {
+        margin-top: 10px;
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .chip {
+        padding: 6px 9px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+      }
+
+      .chip.warm {
+        background: rgba(255, 211, 123, 0.15);
+        border: 1px solid rgba(255, 211, 123, 0.18);
+        color: #ffe8b0;
+      }
+
+      .chip.blue {
+        background: rgba(149, 223, 255, 0.14);
+        border: 1px solid rgba(149, 223, 255, 0.18);
+        color: #daf3ff;
+      }
+
+      .task-list {
+        margin-top: 10px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .task {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 10px 11px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .task.done {
+        background: rgba(82, 223, 131, 0.08);
+        border-color: rgba(82, 223, 131, 0.18);
+      }
+
+      .task-icon {
+        width: 26px;
+        font-size: 20px;
+        text-align: center;
+        flex: none;
+      }
+
+      .task-main {
+        flex: 1;
+      }
+
+      .task-name {
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .task-sub {
+        margin-top: 3px;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.62);
+        font-weight: 700;
+      }
+
+      .task-btn {
+        flex: none;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: rgba(82, 223, 131, 0.14);
+        border: 1px solid rgba(82, 223, 131, 0.22);
+        color: #dffbe7;
+        font-size: 10px;
+        font-weight: 900;
+      }
+
+      .mini {
+        margin-top: 10px;
+        padding: 12px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, rgba(18, 54, 67, 0.92), rgba(12, 29, 40, 0.9));
+        border: 1px solid rgba(149, 223, 255, 0.16);
+      }
+
+      .mini-label {
+        font-size: 9px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.5);
+        font-weight: 800;
+      }
+
+      .mini-title {
+        margin-top: 6px;
+        font-size: 14px;
+        line-height: 1.15;
+        font-weight: 900;
+      }
+
+      .mini-text {
+        margin-top: 5px;
+        font-size: 11px;
+        line-height: 1.35;
+        color: rgba(255, 255, 255, 0.68);
+        font-weight: 700;
+      }
+
+      .overlay {
+        position: absolute;
+        left: -10px;
+        bottom: 42px;
+        width: 210px;
+        padding: 14px 14px 13px;
+        border-radius: 20px;
+        background: rgba(10, 24, 16, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(12px);
+        box-shadow: 0 18px 34px rgba(0, 0, 0, 0.3);
+        z-index: 3;
+      }
+
+      .overlay-label {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.52);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 800;
+      }
+
+      .overlay-value {
+        margin-top: 6px;
+        font-size: 25px;
+        line-height: 1;
+        font-weight: 900;
+        color: #c6ffd8;
+      }
+
+      .overlay-text {
+        margin-top: 8px;
+        font-size: 12px;
+        line-height: 1.32;
+        color: rgba(245, 255, 247, 0.84);
+        font-weight: 800;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="canvas">
+      <div class="left">
+        <div class="brand">
+          <div class="brand-badge">🌿</div>
+          <div>МойАгроном</div>
+        </div>
+
+        <div class="eyebrow">сегодня в огороде</div>
+        <h1>Что делать<br />сегодня</h1>
+        <div class="lead">План, погода и подсказки именно под ваши культуры.</div>
+
+        <div class="benefits">
+          <div class="benefit"><span class="benefit-dot"></span>Понятные задачи на день</div>
+          <div class="benefit"><span class="benefit-dot"></span>Подсказки по погоде</div>
+          <div class="benefit"><span class="benefit-dot"></span>Без лишней воды</div>
+        </div>
+
+        <div class="cta">Открыть бесплатно</div>
+      </div>
+
+      <div class="phone-stage">
+        <div class="phone-glow"></div>
+
+        <div class="overlay">
+          <div class="overlay-label">на сегодня</div>
+          <div class="overlay-value">3 задачи</div>
+          <div class="overlay-text">Одна уже выполнена. Осталось полить, проверить проветривание и рассаду.</div>
+        </div>
+
+        <div class="phone">
+          <div class="notch"></div>
+          <div class="screen">
+            <div class="statusbar">
+              <div>21:39</div>
+              <div>4G ▮▮▮ 37%</div>
+            </div>
+
+            <div class="app">
+              <div class="topline">Добрый вечер, Антон</div>
+              <div class="title-row">
+                <div class="date">3 апреля</div>
+                <div class="moon">🌙</div>
+              </div>
+
+              <div class="section">Сегодня в огороде</div>
+              <div class="today-card">
+                <div class="today-top">
+                  <div>
+                    <div class="today-label">Условия подходят для мягкого полива</div>
+                    <div class="today-sub">Почва не должна пересохнуть. Вечером проверьте теплицу и рассаду.</div>
+                  </div>
+                  <div class="progress">
+                    <div class="progress-value">1/3</div>
+                    <div class="progress-label">выполнено</div>
+                  </div>
+                </div>
+
+                <div class="chips">
+                  <div class="chip warm">днём до +19°C</div>
+                  <div class="chip blue">ветер слабый</div>
+                </div>
+              </div>
+
+              <div class="task-list">
+                <div class="task done">
+                  <div class="task-icon">💧</div>
+                  <div class="task-main">
+                    <div class="task-name">Полить томаты</div>
+                    <div class="task-sub">Теплица • вечером</div>
+                  </div>
+                  <div class="task-btn">готово</div>
+                </div>
+
+                <div class="task">
+                  <div class="task-icon">🌬️</div>
+                  <div class="task-main">
+                    <div class="task-name">Проветрить теплицу</div>
+                    <div class="task-sub">Открыть на 30-40 минут</div>
+                  </div>
+                  <div class="task-btn">сделать</div>
+                </div>
+
+                <div class="task">
+                  <div class="task-icon">🌱</div>
+                  <div class="task-main">
+                    <div class="task-name">Проверить рассаду</div>
+                    <div class="task-sub">Перец и капуста • без подкормки</div>
+                  </div>
+                  <div class="task-btn">сделать</div>
+                </div>
+              </div>
+
+              <div class="mini">
+                <div class="mini-label">совет дня</div>
+                <div class="mini-title">Не переливайте грядки перед прохладной ночью</div>
+                <div class="mini-text">Лучше умеренный вечерний полив, чем сильное промачивание перед похолоданием.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

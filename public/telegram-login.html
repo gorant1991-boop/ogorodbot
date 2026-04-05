@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Вход через Telegram • МойАгроном</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at top, rgba(255,198,112,.22), transparent 34%), linear-gradient(180deg, #fff8ef 0%, #eef5e8 100%);
+        font-family: Nunito, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #213126;
+      }
+      .page {
+        width: min(100%, 420px);
+        padding: 24px;
+        text-align: center;
+      }
+      .card {
+        background: rgba(255,255,255,.8);
+        border: 1px solid rgba(86,110,72,.12);
+        border-radius: 24px;
+        padding: 28px 22px;
+        box-shadow: 0 18px 40px rgba(76,103,54,.12);
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 30px;
+        line-height: 1.05;
+      }
+      p {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.55;
+        color: #5a6b53;
+      }
+      .widget {
+        margin-top: 18px;
+        min-height: 44px;
+        display: flex;
+        justify-content: center;
+      }
+      .actions {
+        margin-top: 18px;
+      }
+      .back {
+        color: #38603a;
+        font-weight: 800;
+        text-decoration: none;
+      }
+      .hint {
+        margin-top: 14px;
+        font-size: 13px;
+        color: #6c715f;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <div class="card">
+        <h1>Вход через Telegram</h1>
+        <p>Подтвердите вход в Telegram. После авторизации сервис вернёт вас обратно в МойАгроном.</p>
+        <div class="widget">
+          <script
+            async
+            src="https://telegram.org/js/telegram-widget.js?22"
+            data-telegram-login="Ogorodai_bot"
+            data-size="large"
+            data-radius="16"
+            data-userpic="false"
+            data-request-access="write"
+            data-auth-url="https://ogorod-ai.ru/?tg_login=1"
+          ></script>
+        </div>
+        <div class="hint">Если после подтверждения ничего не произошло, закройте это окно и попробуйте ещё раз из обычного браузера, не из встроенного webview.</div>
+        <div class="actions">
+          <a class="back" href="/">Назад в МойАгроном</a>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

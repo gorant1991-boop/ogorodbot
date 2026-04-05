@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>МойАгроном — план на неделю</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        width: 1200px;
+        height: 900px;
+        overflow: hidden;
+        font-family: "Nunito", "SF Pro Display", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 16% 14%, rgba(116, 255, 162, 0.15), transparent 25%),
+          radial-gradient(circle at 84% 18%, rgba(96, 165, 250, 0.10), transparent 22%),
+          linear-gradient(180deg, #102118 0%, #09120d 100%);
+        color: #f4fff6;
+      }
+      .canvas {
+        width: 100%;
+        height: 100%;
+        padding: 46px;
+      }
+      .frame {
+        width: 100%;
+        height: 100%;
+        border-radius: 34px;
+        background: linear-gradient(180deg, rgba(10,21,14,.96), rgba(7,14,10,.99));
+        border: 1px solid rgba(255,255,255,.08);
+        box-shadow: 0 34px 110px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.05);
+        overflow: hidden;
+        position: relative;
+      }
+      .content {
+        display: grid;
+        grid-template-columns: 0.9fr 1.1fr;
+        gap: 22px;
+        height: 100%;
+        padding: 40px;
+      }
+      .phone-zone {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+      .phone-glow {
+        position: absolute;
+        width: 520px;
+        height: 520px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(74,222,128,.20), transparent 70%);
+        filter: blur(22px);
+      }
+      .phone {
+        position: relative;
+        width: 360px;
+        height: 736px;
+        border-radius: 48px;
+        background: linear-gradient(180deg, #0f1512 0%, #050806 100%);
+        padding: 14px;
+        box-shadow: 0 28px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06), inset 0 1px 0 rgba(255,255,255,.08);
+      }
+      .phone::before {
+        content: "";
+        position: absolute;
+        top: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 136px;
+        height: 30px;
+        border-radius: 999px;
+        background: rgba(6, 9, 8, .96);
+        z-index: 3;
+      }
+      .screen {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border-radius: 36px;
+        background:
+          radial-gradient(circle at 18% 8%, rgba(74,222,128,.14), transparent 24%),
+          linear-gradient(180deg, #102218 0%, #0a140e 100%);
+        border: 1px solid rgba(255,255,255,.05);
+      }
+      .status {
+        display: flex;
+        justify-content: space-between;
+        padding: 18px 22px 8px;
+        font-size: 13px;
+        font-weight: 800;
+        color: rgba(255,255,255,.88);
+      }
+      .moon-header {
+        text-align: center;
+        padding: 8px 22px 12px;
+      }
+      .moon-big {
+        font-size: 50px;
+        line-height: 1;
+      }
+      .moon-sign {
+        margin-top: 8px;
+        font-size: 24px;
+        font-weight: 900;
+      }
+      .moon-day {
+        margin-top: 6px;
+        font-size: 13px;
+        color: rgba(255,255,255,.58);
+        font-weight: 700;
+      }
+      .moon-card {
+        margin: 0 18px 10px;
+        border-radius: 20px;
+        padding: 14px 16px;
+        background: rgba(255,255,255,.06);
+        border: 1px solid rgba(255,255,255,.08);
+      }
+      .moon-card.good {
+        background: rgba(74,222,128,.10);
+        border-color: rgba(74,222,128,.18);
+      }
+      .moon-card.warn {
+        background: rgba(251,191,36,.08);
+        border-color: rgba(251,191,36,.16);
+      }
+      .moon-card-title {
+        font-size: 13px;
+        font-weight: 900;
+        color: #fff;
+      }
+      .moon-card-body {
+        margin-top: 8px;
+        font-size: 13px;
+        line-height: 1.45;
+        color: rgba(255,255,255,.72);
+      }
+      .helper {
+        padding: 0 18px 8px;
+        font-size: 11px;
+        line-height: 1.45;
+        color: rgba(255,255,255,.46);
+      }
+      .week-card {
+        margin: 4px 18px 0;
+        border-radius: 22px;
+        background: rgba(15,23,42,.56);
+        border: 1px solid rgba(255,255,255,.08);
+        padding: 14px;
+      }
+      .week-title {
+        font-size: 18px;
+        font-weight: 900;
+      }
+      .week-sub {
+        margin-top: 6px;
+        font-size: 12px;
+        color: rgba(255,255,255,.56);
+      }
+      .week-day-row {
+        margin-top: 10px;
+        display: grid;
+        gap: 7px;
+        padding: 10px 0;
+        border-top: 1px solid rgba(255,255,255,.06);
+      }
+      .week-day-row:first-of-type {
+        border-top: none;
+        padding-top: 0;
+      }
+      .week-day-label {
+        font-size: 12px;
+        font-weight: 900;
+        color: #bbf7d0;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+      }
+      .week-task {
+        display: grid;
+        gap: 4px;
+        background: rgba(255,255,255,.05);
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 14px;
+        padding: 10px 12px;
+      }
+      .week-task-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .week-task-action {
+        font-size: 12px;
+        font-weight: 800;
+        color: #fff;
+      }
+      .week-task-crop {
+        font-size: 11px;
+        color: rgba(255,255,255,.58);
+      }
+      .week-task-reason {
+        font-size: 11px;
+        line-height: 1.4;
+        color: rgba(255,255,255,.50);
+      }
+      .tabs {
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        bottom: 14px;
+        display: flex;
+        justify-content: space-around;
+        padding: 12px 0 10px;
+        border-top: 1px solid rgba(255,255,255,.08);
+        background: rgba(8,14,10,.98);
+        border-bottom-left-radius: 22px;
+        border-bottom-right-radius: 22px;
+      }
+      .tab {
+        text-align: center;
+        color: rgba(255,255,255,.44);
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .tab strong {
+        display: block;
+        margin-top: 4px;
+        color: #4ade80;
+      }
+      .copy {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding-right: 10px;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: 999px;
+        background: rgba(255,255,255,.05);
+        border: 1px solid rgba(255,255,255,.08);
+        width: fit-content;
+      }
+      .brand-badge {
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #4ade80, #15803d);
+        box-shadow: 0 12px 24px rgba(22,163,74,.26);
+        font-size: 18px;
+      }
+      .brand-name {
+        font-size: 26px;
+        font-weight: 900;
+      }
+      .eyebrow {
+        margin-top: 22px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(74,222,128,.10);
+        border: 1px solid rgba(74,222,128,.22);
+        font-size: 14px;
+        font-weight: 900;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: #d7ffe4;
+        width: fit-content;
+      }
+      h1 {
+        margin: 22px 0 0;
+        max-width: 520px;
+        font-size: 74px;
+        line-height: .95;
+        font-weight: 900;
+        letter-spacing: -.07em;
+      }
+      .lead {
+        margin-top: 18px;
+        max-width: 520px;
+        font-size: 28px;
+        line-height: 1.18;
+        color: rgba(241,255,245,.76);
+        font-weight: 700;
+      }
+      .feature-list {
+        margin-top: 26px;
+        display: grid;
+        gap: 14px;
+        max-width: 520px;
+      }
+      .feature {
+        display: grid;
+        grid-template-columns: 42px 1fr;
+        gap: 14px;
+        align-items: start;
+        padding: 16px 18px;
+        border-radius: 20px;
+        background: rgba(255,255,255,.05);
+        border: 1px solid rgba(255,255,255,.08);
+      }
+      .feature-icon {
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        background: rgba(74,222,128,.10);
+        color: #86efac;
+        font-size: 20px;
+      }
+      .feature-title {
+        font-size: 19px;
+        font-weight: 900;
+        color: #f8fafc;
+      }
+      .feature-text {
+        margin-top: 4px;
+        font-size: 15px;
+        line-height: 1.45;
+        color: rgba(255,255,255,.70);
+      }
+      .cta {
+        margin-top: 26px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px 30px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, #4ade80, #16a34a);
+        color: #fff;
+        box-shadow: 0 20px 38px rgba(22,163,74,.30);
+        font-size: 27px;
+        font-weight: 900;
+        width: fit-content;
+      }
+      .site {
+        margin-top: 18px;
+        font-size: 13px;
+        color: rgba(255,255,255,.48);
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="canvas">
+      <div class="frame">
+        <div class="content">
+          <section class="phone-zone">
+            <div class="phone-glow"></div>
+            <div class="phone">
+              <div class="screen">
+                <div class="status">
+                  <span>21:39</span>
+                  <span>4G ▮▮▮ 37%</span>
+                </div>
+                <div class="moon-header">
+                  <div class="moon-big">🌔</div>
+                  <div class="moon-sign">Растущая Луна</div>
+                  <div class="moon-day">9-й лунный день · 68%</div>
+                </div>
+                <div class="moon-card good">
+                  <div class="moon-card-title">✅ Благоприятно сегодня</div>
+                  <div class="moon-card-body">Полив, лёгкая подкормка, уход за томатами и зеленью.</div>
+                </div>
+                <div class="moon-card warn">
+                  <div class="moon-card-title">❌ Не рекомендуется</div>
+                  <div class="moon-card-body">Сильная обрезка и любые работы, если почва уже переувлажнена.</div>
+                </div>
+                <div class="helper">Лунный календарь это ориентир. Сначала смотрите на погоду и состояние растений.</div>
+                <div class="week-card">
+                  <div class="week-title">📅 План на неделю</div>
+                  <div class="week-sub">Отдельный доступ активен до 11 апреля.</div>
+
+                  <div class="week-day-row">
+                    <div class="week-day-label">Пт, 4 апр</div>
+                    <div class="week-task">
+                      <div class="week-task-line">
+                        <span class="week-task-action">Проверить влажность</span>
+                        <span class="week-task-crop">Томат</span>
+                      </div>
+                      <div class="week-task-reason">После сырой ночи не поливайте вслепую, сначала проверьте корни.</div>
+                    </div>
+                    <div class="week-task">
+                      <div class="week-task-line">
+                        <span class="week-task-action">Проветрить теплицу</span>
+                        <span class="week-task-crop">Огурец</span>
+                      </div>
+                      <div class="week-task-reason">Снизьте сырость на листьях, чтобы не разгонять грибковые риски.</div>
+                    </div>
+                  </div>
+
+                  <div class="week-day-row">
+                    <div class="week-day-label">Сб, 5 апр</div>
+                    <div class="week-task">
+                      <div class="week-task-line">
+                        <span class="week-task-action">Лёгкая подкормка</span>
+                        <span class="week-task-crop">Томат</span>
+                      </div>
+                      <div class="week-task-reason">Если почва уже просохла и корни работают ровно, можно дать мягкое питание.</div>
+                    </div>
+                  </div>
+
+                  <div class="week-day-row">
+                    <div class="week-day-label">Вс, 6 апр</div>
+                    <div class="week-task">
+                      <div class="week-task-line">
+                        <span class="week-task-action">Осмотреть листья</span>
+                        <span class="week-task-crop">Клубника</span>
+                      </div>
+                      <div class="week-task-reason">После сырой погоды лучше заранее поймать пятна и слабые листья.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="tabs">
+                  <div class="tab">🌱 Растения</div>
+                  <div class="tab">📘 Дневник</div>
+                  <div class="tab"><strong>🌙 Луна</strong></div>
+                  <div class="tab">👤 Профиль</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="copy">
+            <div class="brand">
+              <div class="brand-badge">🌿</div>
+              <div class="brand-name">МойАгроном</div>
+            </div>
+            <div class="eyebrow">Реальная польза</div>
+            <h1>Понятный план по вашему огороду</h1>
+            <div class="lead">Не абстрактные советы, а экран с недельным планом, погодными рисками и понятными действиями по культурам.</div>
+
+            <div class="feature-list">
+              <div class="feature">
+                <div class="feature-icon">📅</div>
+                <div>
+                  <div class="feature-title">План на 7 дней</div>
+                  <div class="feature-text">Что сделать сегодня и в ближайшие дни по вашим культурам, а не общие статьи “для всех”.</div>
+                </div>
+              </div>
+              <div class="feature">
+                <div class="feature-icon">🌦️</div>
+                <div>
+                  <div class="feature-title">Погода и риски</div>
+                  <div class="feature-text">Заморозки, сырость, жара и моменты, когда полив или подкормка могут только навредить.</div>
+                </div>
+              </div>
+              <div class="feature">
+                <div class="feature-icon">🌱</div>
+                <div>
+                  <div class="feature-title">Под ваши культуры</div>
+                  <div class="feature-text">Томаты, огурцы, ягоды, зелень и остальные культуры, которые вы реально ведёте в приложении.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="cta">Попробовать бесплатно</div>
+            <div class="site">ogorod-ai.ru</div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

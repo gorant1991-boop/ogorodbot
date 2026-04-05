@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>МойАгроном — Главная</title>
+    <style>
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        margin: 0;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 15% 10%, rgba(74, 222, 128, 0.16), transparent 24%),
+          radial-gradient(circle at 85% 14%, rgba(96, 165, 250, 0.12), transparent 22%),
+          linear-gradient(180deg, #102218 0%, #08110c 100%);
+        font-family: "Nunito", "SF Pro Display", "Segoe UI", sans-serif;
+      }
+
+      .canvas {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .screen-wrap {
+        position: absolute;
+        left: 50%;
+        top: 54px;
+        transform: translateX(-50%) scale(2.15);
+        transform-origin: top center;
+        filter: drop-shadow(0 24px 70px rgba(0, 0, 0, 0.28));
+      }
+
+      .main {
+        background: #0a1a0d;
+        width: 480px;
+        height: 840px;
+        margin: 0 auto;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border-radius: 28px;
+        border: 1px solid rgba(255,255,255,.06);
+      }
+
+      .main-header {
+        padding: 22px 18px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      }
+
+      .greeting {
+        font-size: 12px;
+        color: rgba(255,255,255,.4);
+        font-weight: 600;
+        max-width: 250px;
+      }
+
+      .date {
+        font-size: 18px;
+        font-weight: 800;
+        color: #fff;
+        text-transform: capitalize;
+      }
+
+      .lunar-badge {
+        background: rgba(168,85,247,.15);
+        border: 1px solid rgba(168,85,247,.3);
+        border-radius: 20px;
+        padding: 5px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #c084fc;
+        white-space: nowrap;
+      }
+
+      .tab-scroll {
+        flex: 1;
+        overflow: hidden;
+        padding-bottom: 92px;
+      }
+
+      .tab-content {
+        padding-bottom: 8px;
+      }
+
+      .section-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: rgba(255,255,255,.52);
+        letter-spacing: .5px;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+      }
+
+      .today-focus-card {
+        margin: 0 16px 12px;
+        background: linear-gradient(135deg, rgba(40,76,56,.92), rgba(17,43,28,.88));
+        border: 1px solid rgba(120,255,180,.16);
+        border-radius: 20px;
+        padding: 16px;
+      }
+
+      .today-focus-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .today-focus-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: #fff;
+      }
+
+      .today-focus-sub {
+        margin-top: 6px;
+        font-size: 13px;
+        line-height: 1.55;
+        color: rgba(255,255,255,.7);
+        max-width: 320px;
+      }
+
+      .today-focus-progress {
+        min-width: 78px;
+        border-radius: 14px;
+        background: rgba(255,255,255,.08);
+        border: 1px solid rgba(255,255,255,.1);
+        padding: 10px 8px;
+        text-align: center;
+      }
+
+      .today-focus-progress-value {
+        display: block;
+        font-size: 22px;
+        font-weight: 900;
+        color: #bbf7d0;
+        line-height: 1;
+      }
+
+      .today-focus-progress-label {
+        display: block;
+        margin-top: 4px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        color: rgba(255,255,255,.5);
+        font-weight: 700;
+      }
+
+      .today-risk-row {
+        margin-top: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .risk-badge {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 20px;
+        display: inline-flex;
+        align-self: flex-start;
+      }
+
+      .risk-ok { background: rgba(74,222,128,.15); color: #4ade80; border: 1px solid rgba(74,222,128,.3); }
+      .risk-warn { background: rgba(251,191,36,.15); color: #fbbf24; border: 1px solid rgba(251,191,36,.3); }
+
+      .ops-list {
+        padding: 0 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+
+      .op-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(255,255,255,.06);
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 14px;
+        padding: 10px 12px;
+      }
+
+      .op-row.is-complete {
+        background: rgba(74,222,128,.08);
+        border-color: rgba(74,222,128,.2);
+      }
+
+      .op-icon {
+        font-size: 22px;
+        flex-shrink: 0;
+      }
+
+      .op-info {
+        flex: 1;
+      }
+
+      .op-name {
+        font-size: 14px;
+        font-weight: 800;
+        color: #fff;
+      }
+
+      .op-action {
+        font-size: 12px;
+        color: rgba(255,255,255,.56);
+        margin-top: 3px;
+        line-height: 1.4;
+      }
+
+      .btn-done-sm {
+        background: rgba(74,222,128,.15);
+        border: 1px solid rgba(74,222,128,.3);
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 800;
+        color: #4ade80;
+        font-family: "Nunito", sans-serif;
+        flex-shrink: 0;
+        min-width: 90px;
+        text-align: center;
+      }
+
+      .btn-done-sm.done {
+        background: rgba(74,222,128,.22);
+        color: #dcfce7;
+        border-color: rgba(74,222,128,.4);
+      }
+
+      .focus-card {
+        margin: 0 16px 12px;
+        border-radius: 20px;
+        padding: 16px;
+        border: 1px solid rgba(255,255,255,.1);
+      }
+
+      .focus-card-label {
+        font-size: 12px;
+        font-weight: 700;
+        color: rgba(255,255,255,.5);
+        text-transform: uppercase;
+        letter-spacing: .45px;
+        margin-bottom: 8px;
+      }
+
+      .focus-card-title {
+        font-size: 17px;
+        font-weight: 800;
+        color: #fff;
+      }
+
+      .focus-card-body {
+        margin-top: 6px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: rgba(255,255,255,.72);
+      }
+
+      .focus-card-action {
+        width: 100%;
+        margin-top: 14px;
+        border: none;
+        border-radius: 12px;
+        padding: 11px 12px;
+        background: linear-gradient(135deg, #4ade80, #16a34a);
+        color: #fff;
+        font-family: "Nunito", sans-serif;
+        font-size: 13px;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .focus-card-action.secondary {
+        background: rgba(255,255,255,.08);
+        border: 1px solid rgba(255,255,255,.12);
+      }
+
+      .weekly-focus-card {
+        background: linear-gradient(135deg, rgba(19,54,67,.88), rgba(14,32,44,.88));
+        border-color: rgba(96,165,250,.18);
+      }
+
+      .planner-focus-card {
+        background: linear-gradient(135deg, rgba(33,62,92,.9), rgba(22,37,66,.88));
+        border-color: rgba(129,140,248,.22);
+      }
+
+      .focus-card-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .focus-badge {
+        min-width: 54px;
+        height: 54px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255,255,255,.08);
+        border: 1px solid rgba(255,255,255,.1);
+        color: #bfdbfe;
+        font-size: 20px;
+        font-weight: 900;
+        flex-shrink: 0;
+      }
+
+      .weekly-stats-grid {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .weekly-stat-card {
+        background: rgba(255,255,255,.05);
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 14px;
+        padding: 12px;
+      }
+
+      .weekly-stat-value {
+        font-size: 20px;
+        font-weight: 900;
+        color: #fff;
+      }
+
+      .weekly-stat-label {
+        margin-top: 4px;
+        font-size: 12px;
+        line-height: 1.45;
+        color: rgba(255,255,255,.56);
+      }
+
+      .planner-preview-list {
+        margin-top: 12px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .planner-preview-item {
+        display: grid;
+        gap: 6px;
+        background: rgba(255,255,255,.05);
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 14px;
+        padding: 10px 12px;
+      }
+
+      .planner-preview-main {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .planner-preview-action {
+        font-size: 12px;
+        font-weight: 700;
+        color: #fff;
+      }
+
+      .planner-preview-crop {
+        font-size: 11px;
+        color: rgba(255,255,255,.58);
+        text-align: right;
+      }
+
+      .planner-preview-reason {
+        font-size: 11px;
+        line-height: 1.45;
+        color: rgba(255,255,255,.5);
+      }
+
+      .navbar {
+        display: flex;
+        justify-content: space-around;
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        padding: 10px 0 16px;
+        border-top: 1px solid rgba(255,255,255,.08);
+        background: rgba(10,26,13,.98);
+        flex-shrink: 0;
+        box-shadow: 0 -2px 8px rgba(0,0,0,.3);
+      }
+
+      .nav-item {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        background: none;
+        border: none;
+        font-family: "Nunito", sans-serif;
+        padding: 6px 10px;
+        min-height: 48px;
+      }
+
+      .nav-icon {
+        font-size: 20px;
+        line-height: 1;
+      }
+
+      .nav-label {
+        font-size: 11px;
+        color: rgba(255,255,255,.42);
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .nav-item.active .nav-label {
+        color: #4ade80;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="canvas">
+      <div class="screen-wrap">
+        <div class="main">
+          <div class="main-header">
+            <div>
+              <div class="greeting">Доброе утро, Антон</div>
+              <div class="date">4 апреля, суббота</div>
+            </div>
+            <div class="lunar-badge">🌙 Луна</div>
+          </div>
+
+          <div class="tab-scroll">
+            <div class="tab-content">
+              <div class="section-title" style="padding: 0 16px; margin-top: 4px;">Сегодня в огороде</div>
+
+              <div class="today-focus-card">
+                <div class="today-focus-top">
+                  <div>
+                    <div class="today-focus-title">План на день</div>
+                    <div class="today-focus-sub">
+                      Отмечайте выполненное, чтобы копилась история ухода и было проще держать ритм каждый день.
+                    </div>
+                  </div>
+                  <div class="today-focus-progress">
+                    <span class="today-focus-progress-value">1/3</span>
+                    <span class="today-focus-progress-label">выполнено</span>
+                  </div>
+                </div>
+
+                <div class="today-risk-row">
+                  <div class="risk-badge risk-warn">Днём до +19°C, лучше полить ближе к вечеру</div>
+                  <div class="risk-badge risk-ok">Почва держит влагу, сильного ветра не ждём</div>
+                </div>
+              </div>
+
+              <div class="ops-list">
+                <div class="op-row is-complete">
+                  <span class="op-icon">🍅</span>
+                  <div class="op-info">
+                    <div class="op-name">Томаты</div>
+                    <div class="op-action">Отмечено в дневнике сегодня</div>
+                  </div>
+                  <div class="btn-done-sm done">Готово</div>
+                </div>
+
+                <div class="op-row">
+                  <span class="op-icon">🥒</span>
+                  <div class="op-info">
+                    <div class="op-name">Огурцы</div>
+                    <div class="op-action">Проветрить · Теплица</div>
+                  </div>
+                  <div class="btn-done-sm">Отметить</div>
+                </div>
+
+                <div class="op-row">
+                  <span class="op-icon">🌶️</span>
+                  <div class="op-info">
+                    <div class="op-name">Перец</div>
+                    <div class="op-action">Проверить рассаду · Дом</div>
+                  </div>
+                  <div class="btn-done-sm">Отметить</div>
+                </div>
+              </div>
+
+              <div class="focus-card weekly-focus-card">
+                <div class="focus-card-label">Пульс недели</div>
+                <div class="focus-card-top">
+                  <div>
+                    <div class="focus-card-title">Вы уже держите ритм сезона</div>
+                    <div class="focus-card-body">Были отметки почти каждый день. История ухода уже помогает не повторять одно и то же слишком рано.</div>
+                  </div>
+                  <div class="focus-badge">5д</div>
+                </div>
+
+                <div class="weekly-stats-grid">
+                  <div class="weekly-stat-card">
+                    <div class="weekly-stat-value">5/7</div>
+                    <div class="weekly-stat-label">дней с активностью</div>
+                  </div>
+                  <div class="weekly-stat-card">
+                    <div class="weekly-stat-value">12</div>
+                    <div class="weekly-stat-label">записей за неделю</div>
+                  </div>
+                  <div class="weekly-stat-card">
+                    <div class="weekly-stat-value">6</div>
+                    <div class="weekly-stat-label">культур с уходом</div>
+                  </div>
+                  <div class="weekly-stat-card">
+                    <div class="weekly-stat-value">1</div>
+                    <div class="weekly-stat-label">дел закрыто сегодня</div>
+                  </div>
+                </div>
+
+                <div class="focus-card-action secondary">Открыть дневник недели</div>
+              </div>
+
+              <div class="focus-card planner-focus-card">
+                <div class="focus-card-label">План на 7 дней</div>
+                <div class="focus-card-top">
+                  <div>
+                    <div class="focus-card-title">Неделя уже собрана под ваш огород</div>
+                    <div class="focus-card-body">План пересчитывается под текущий состав огорода, дневник и погоду.</div>
+                  </div>
+                  <div class="focus-badge">7</div>
+                </div>
+
+                <div class="planner-preview-list">
+                  <div class="planner-preview-item">
+                    <div class="planner-preview-main">
+                      <span class="planner-preview-action">Проверить влажность</span>
+                      <span class="planner-preview-crop">томаты</span>
+                    </div>
+                    <span class="planner-preview-reason">После тёплого дня земля в теплице может пересыхать быстрее.</span>
+                  </div>
+
+                  <div class="planner-preview-item">
+                    <div class="planner-preview-main">
+                      <span class="planner-preview-action">Проветрить</span>
+                      <span class="planner-preview-crop">огурцы</span>
+                    </div>
+                    <span class="planner-preview-reason">Хорошее окно по погоде, можно снизить лишнюю влажность внутри теплицы.</span>
+                  </div>
+
+                  <div class="planner-preview-item">
+                    <div class="planner-preview-main">
+                      <span class="planner-preview-action">Осмотреть листья</span>
+                      <span class="planner-preview-crop">перец</span>
+                    </div>
+                    <span class="planner-preview-reason">После недавнего полива лучше проверить состояние рассады без спешки с подкормкой.</span>
+                  </div>
+                </div>
+
+                <div class="focus-card-action">Открыть план недели</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="navbar">
+            <div class="nav-item active">
+              <div class="nav-icon">🏠</div>
+              <div class="nav-label">Главная</div>
+            </div>
+            <div class="nav-item">
+              <div class="nav-icon">🌱</div>
+              <div class="nav-label">Растения</div>
+            </div>
+            <div class="nav-item">
+              <div class="nav-icon">📖</div>
+              <div class="nav-label">Дневник</div>
+            </div>
+            <div class="nav-item">
+              <div class="nav-icon">🌙</div>
+              <div class="nav-label">Луна</div>
+            </div>
+            <div class="nav-item">
+              <div class="nav-icon">👤</div>
+              <div class="nav-label">Профиль</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

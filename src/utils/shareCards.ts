@@ -94,19 +94,19 @@ function createListLines(items: string[], maxCharsPerLine: number, maxLines: num
 
 function buildSvg(data: OnboardingData, plan: Plan, theme: ShareCardTheme) {
   const summary = summarizeGarden(data)
-  const title = theme === 'premium' ? 'Премиум-огород' : 'Мой огород'
+  const title = theme === 'premium' ? 'Огород под полным контролем' : 'Огород под рукой'
   const subtitle = theme === 'premium'
-    ? 'AI-советы, заметки по сортам и сезон под полным контролем'
-    : 'Грядки, сорта, дневник и всё важное по сезону'
+    ? 'AI-советы, дневник и сезонный план по вашим культурам'
+    : 'AI подсказывает полив, подкормки, риски по погоде и уход по культурам'
   const accent = theme === 'premium' ? '#f7c948' : '#8ae28f'
   const accentSoft = theme === 'premium' ? 'rgba(247,201,72,0.18)' : 'rgba(138,226,143,0.16)'
-  const badge = theme === 'premium' ? 'PREMIUM' : 'ОГОРОДБОТ'
+  const badge = theme === 'premium' ? 'PREMIUM' : 'OGOROD AI'
   const city = data.city || 'Мой участок'
   const exp = getExperienceLabel(data.experience)
   const cropsLines = createListLines(summary.topCrops, 30, 3)
   const varietyLines = createListLines(summary.varietyList, 30, 4)
   const objectsLabel = summary.places.length > 0 ? summary.places.join('  •  ') : 'Объекты ещё не добавлены'
-  const planLabel = plan === 'free' ? 'Бесплатный доступ' : plan === 'base' ? 'Базовая подписка' : 'Премиум-подписка'
+  const planLabel = plan === 'free' ? 'Первый совет бесплатно' : plan === 'base' ? 'Базовая подписка' : 'Премиум-подписка'
 
   const cropsSvg = cropsLines
     .map((line, index) => `<text x="88" y="${500 + index * 24}" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="600" fill="#f8fafc">${escapeXml(line)}</text>`)
@@ -237,10 +237,10 @@ export async function generateGardenShareCard(data: OnboardingData, plan: Plan, 
 
 export async function shareGardenToVk(data: OnboardingData, plan: Plan, theme: ShareCardTheme) {
   const { file } = await generateGardenShareCard(data, plan, theme)
-  const title = theme === 'premium' ? 'Мой премиум-огород в ОгородБоте' : 'Мой огород в ОгородБоте'
+  const title = theme === 'premium' ? 'Огород под контролем в МойАгрономе' : 'Что делать в огороде сегодня'
   const text = theme === 'premium'
-    ? 'Веду сезон в ОгородБоте: AI-советы, свои сорта, дневник и красивый огородный план.'
-    : 'Собрал свой огород в ОгородБоте: культуры, сорта, дневник и сезонные заметки.'
+    ? 'Веду сезон в МойАгрономе: AI-советы, свои сорта, дневник и сезонный план в одном месте.'
+    : 'МойАгроном подсказывает полив, подкормки и риски по погоде под мои культуры. Первый совет можно получить бесплатно.'
 
   const canNativeShare = typeof navigator !== 'undefined' && 'share' in navigator
   const canShareFiles = canNativeShare && 'canShare' in navigator && navigator.canShare({ files: [file] })
@@ -265,6 +265,6 @@ export async function shareGardenToVk(data: OnboardingData, plan: Plan, theme: S
   const shareUrl = new URL('https://vk.com/share.php')
   shareUrl.searchParams.set('url', 'https://ogorod-ai.ru')
   shareUrl.searchParams.set('title', title)
-  shareUrl.searchParams.set('comment', `${text} Карточку я уже сохранил(а) на устройство. Останется только прикрепить изображение к посту.`)
+  shareUrl.searchParams.set('comment', `${text} Карточка уже сохранена на устройство: останется прикрепить её к посту.`)
   window.open(shareUrl.toString(), '_blank', 'noopener,noreferrer')
 }

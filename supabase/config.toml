@@ -27,3 +27,6 @@ verify_jwt = false
 
 [functions.generate-morning-advice]
 verify_jwt = false
+
+[functions.user-data]
+verify_jwt = false
