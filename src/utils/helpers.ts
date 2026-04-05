@@ -40,7 +40,24 @@ const CROP_CASE_FORMS: Record<string, Record<CropCase, string>> = {
   mint: { nominative: 'мята', genitive: 'мяты', dative: 'мяте', accusative: 'мяту', instrumental: 'мятой', prepositional: 'мяте' },
   melissa: { nominative: 'мелисса', genitive: 'мелиссы', dative: 'мелиссе', accusative: 'мелиссу', instrumental: 'мелиссой', prepositional: 'мелиссе' },
   tarragon: { nominative: 'эстрагон', genitive: 'эстрагона', dative: 'эстрагону', accusative: 'эстрагон', instrumental: 'эстрагоном', prepositional: 'эстрагоне' },
-  sorrel: { nominative: 'щавель', genitive: 'щавеля', dative: 'щавелю', accusative: 'щавель', instrumental: 'щавелем', prepositional: 'щавеле' },
+  sorrel:      { nominative: 'щавель',    genitive: 'щавеля',     dative: 'щавелю',     accusative: 'щавель',    instrumental: 'щавелем',     prepositional: 'щавеле' },
+  // Однолетние цветы
+  petunia:     { nominative: 'петунья',   genitive: 'петуньи',    dative: 'петунье',    accusative: 'петунью',   instrumental: 'петуньей',    prepositional: 'петунье' },
+  marigold:    { nominative: 'бархатцы',  genitive: 'бархатцев',  dative: 'бархатцам',  accusative: 'бархатцы',  instrumental: 'бархатцами',  prepositional: 'бархатцах' },
+  nasturtium:  { nominative: 'настурция', genitive: 'настурции',  dative: 'настурции',  accusative: 'настурцию', instrumental: 'настурцией',  prepositional: 'настурции' },
+  zinnia:      { nominative: 'циния',     genitive: 'цинии',      dative: 'цинии',      accusative: 'цинию',     instrumental: 'цинией',      prepositional: 'цинии' },
+  calendula:   { nominative: 'календула', genitive: 'календулы',  dative: 'календуле',  accusative: 'календулу', instrumental: 'календулой',  prepositional: 'календуле' },
+  dahlia:      { nominative: 'георгин',   genitive: 'георгина',   dative: 'георгину',   accusative: 'георгин',   instrumental: 'георгином',   prepositional: 'георгине' },
+  // Многолетние цветы
+  rose:        { nominative: 'роза',      genitive: 'розы',       dative: 'розе',       accusative: 'розу',      instrumental: 'розой',       prepositional: 'розе' },
+  peony:       { nominative: 'пион',      genitive: 'пиона',      dative: 'пиону',      accusative: 'пион',      instrumental: 'пионом',      prepositional: 'пионе' },
+  iris:        { nominative: 'ирис',      genitive: 'ириса',      dative: 'ирису',      accusative: 'ирис',      instrumental: 'ирисом',      prepositional: 'ирисе' },
+  lily:        { nominative: 'лилия',     genitive: 'лилии',      dative: 'лилии',      accusative: 'лилию',     instrumental: 'лилией',      prepositional: 'лилии' },
+  // Луковичные
+  tulip:       { nominative: 'тюльпан',   genitive: 'тюльпана',   dative: 'тюльпану',   accusative: 'тюльпан',   instrumental: 'тюльпаном',   prepositional: 'тюльпане' },
+  narcissus:   { nominative: 'нарцисс',   genitive: 'нарцисса',   dative: 'нарциссу',   accusative: 'нарцисс',   instrumental: 'нарциссом',   prepositional: 'нарциссе' },
+  hyacinth:    { nominative: 'гиацинт',   genitive: 'гиацинта',   dative: 'гиацинту',   accusative: 'гиацинт',   instrumental: 'гиацинтом',   prepositional: 'гиацинте' },
+  crocus:      { nominative: 'крокус',    genitive: 'крокуса',    dative: 'крокусу',    accusative: 'крокус',    instrumental: 'крокусом',    prepositional: 'крокусе' },
 }
 
 /**
@@ -84,6 +101,11 @@ const OPERATION_COOLDOWN_DAYS: Record<string, number> = {
   pruning: 30,
   hilling: 10,
   weeding: 4,
+  deadheading: 3,
+  digging: 365,
+  winterizing: 365,
+  planting: 365,
+  dividing: 730,
 }
 
 const OPERATION_MEMORY_MAX_AGE_DAYS = 150
@@ -248,7 +270,9 @@ export function getFirstOp(id: string): string {
 /**
  * Проверка, является ли культура многолетней
  */
-export const isPerennial = (id: string) => CROP_CATEGORIES[3].crops.some(c => c.id === id)
+export const isPerennial = (id: string) =>
+  CROP_CATEGORIES.filter(c => c.id === 'perennials' || c.id === 'flowers_perennial')
+    .some(cat => cat.crops.some(c => c.id === id))
 
 /**
  * Количество дней с момента даты

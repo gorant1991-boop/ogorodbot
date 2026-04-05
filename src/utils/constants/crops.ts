@@ -39,6 +39,22 @@ export const CROP_DAYS: Record<string, number> = {
   melissa: 60,
   tarragon: 60,
   sorrel: 60,
+  // Однолетние цветы
+  petunia: 70,
+  marigold: 50,
+  nasturtium: 50,
+  zinnia: 65,
+  calendula: 45,
+  dahlia: 90,
+  // Многолетние цветы и луковичные
+  rose: 365,
+  peony: 365,
+  iris: 365,
+  tulip: 365,
+  narcissus: 365,
+  hyacinth: 365,
+  crocus: 365,
+  lily: 365,
 }
 
 // ============= Категории культур =============
@@ -104,6 +120,32 @@ export const CROP_CATEGORIES = [
       { id: 'sorrel', icon: '🍃', name: 'Щавель' },
     ],
   },
+  {
+    id: 'flowers_annual',
+    label: '🌸 Однолетние цветы',
+    crops: [
+      { id: 'petunia',    icon: '🌸', name: 'Петунья' },
+      { id: 'marigold',   icon: '🟡', name: 'Бархатцы' },
+      { id: 'nasturtium', icon: '🌺', name: 'Настурция' },
+      { id: 'zinnia',     icon: '🌻', name: 'Циния' },
+      { id: 'calendula',  icon: '🟠', name: 'Календула' },
+      { id: 'dahlia',     icon: '🌺', name: 'Георгин' },
+    ],
+  },
+  {
+    id: 'flowers_perennial',
+    label: '🌷 Многолетние и луковичные',
+    crops: [
+      { id: 'rose',      icon: '🌹', name: 'Роза' },
+      { id: 'peony',     icon: '🌸', name: 'Пион' },
+      { id: 'iris',      icon: '🪻', name: 'Ирис' },
+      { id: 'tulip',     icon: '🌷', name: 'Тюльпан' },
+      { id: 'narcissus', icon: '🤍', name: 'Нарцисс' },
+      { id: 'hyacinth',  icon: '💜', name: 'Гиацинт' },
+      { id: 'crocus',    icon: '🟣', name: 'Крокус' },
+      { id: 'lily',      icon: '🌺', name: 'Лилия' },
+    ],
+  },
 ]
 
 // Плоский список всех культур
@@ -148,6 +190,23 @@ export const CROP_OPERATIONS: Record<string, { id: string; label: string }[]> = 
   melissa:     [{ id: 'watering', label: '💧 Полив' }, { id: 'disease', label: '⚠️ Болезни' }],
   tarragon:    [{ id: 'watering', label: '💧 Полив' }, { id: 'disease', label: '⚠️ Болезни' }],
   sorrel:      [{ id: 'watering', label: '💧 Полив' }, { id: 'weeding', label: '🌾 Прополка' }, { id: 'disease', label: '⚠️ Болезни' }],
+  // Однолетние цветы
+  petunia:     [{ id: 'watering', label: '💧 Полив' }, { id: 'feeding', label: '🌿 Подкормка' }, { id: 'deadheading', label: '✂️ Обрыв увядших' }, { id: 'pinching', label: '✂️ Прищипка' }, { id: 'disease', label: '⚠️ Болезни' }],
+  marigold:    [{ id: 'watering', label: '💧 Полив' }, { id: 'feeding', label: '🌿 Подкормка' }, { id: 'deadheading', label: '✂️ Обрыв увядших' }, { id: 'weeding', label: '🌾 Прополка' }, { id: 'disease', label: '⚠️ Болезни' }],
+  nasturtium:  [{ id: 'watering', label: '💧 Полив' }, { id: 'deadheading', label: '✂️ Обрыв увядших' }, { id: 'weeding', label: '🌾 Прополка' }, { id: 'disease', label: '⚠️ Болезни' }],
+  zinnia:      [{ id: 'watering', label: '💧 Полив' }, { id: 'feeding', label: '🌿 Подкормка' }, { id: 'deadheading', label: '✂️ Обрыв увядших' }, { id: 'weeding', label: '🌾 Прополка' }, { id: 'disease', label: '⚠️ Болезни' }],
+  calendula:   [{ id: 'watering', label: '💧 Полив' }, { id: 'deadheading', label: '✂️ Обрыв увядших' }, { id: 'weeding', label: '🌾 Прополка' }, { id: 'disease', label: '⚠️ Болезни' }],
+  dahlia:      [{ id: 'watering', label: '💧 Полив' }, { id: 'feeding', label: '🌿 Подкормка' }, { id: 'tying', label: '🪢 Подвязка' }, { id: 'deadheading', label: '✂️ Обрыв увядших' }, { id: 'digging', label: '⛏️ Выкопка клубней' }, { id: 'disease', label: '⚠️ Болезни' }],
+  // Многолетние цветы
+  rose:        [{ id: 'watering', label: '💧 Полив' }, { id: 'feeding', label: '🌿 Подкормка' }, { id: 'pruning', label: '✂️ Обрезка' }, { id: 'deadheading', label: '✂️ Обрыв увядших' }, { id: 'winterizing', label: '❄️ Укрытие на зиму' }, { id: 'disease', label: '⚠️ Болезни' }],
+  peony:       [{ id: 'watering', label: '💧 Полив' }, { id: 'feeding', label: '🌿 Подкормка' }, { id: 'deadheading', label: '✂️ Обрыв увядших' }, { id: 'pruning', label: '✂️ Обрезка осенью' }, { id: 'disease', label: '⚠️ Болезни' }],
+  iris:        [{ id: 'watering', label: '💧 Полив' }, { id: 'feeding', label: '🌿 Подкормка' }, { id: 'deadheading', label: '✂️ Обрыв увядших' }, { id: 'dividing', label: '🪻 Деление куста' }, { id: 'disease', label: '⚠️ Болезни' }],
+  lily:        [{ id: 'watering', label: '💧 Полив' }, { id: 'feeding', label: '🌿 Подкормка' }, { id: 'tying', label: '🪢 Подвязка' }, { id: 'deadheading', label: '✂️ Обрыв увядших' }, { id: 'winterizing', label: '❄️ Мульчирование на зиму' }, { id: 'disease', label: '⚠️ Болезни' }],
+  // Луковичные (осенняя посадка)
+  tulip:       [{ id: 'planting', label: '🧅 Посадка луковиц' }, { id: 'watering', label: '💧 Полив' }, { id: 'feeding', label: '🌿 Подкормка' }, { id: 'deadheading', label: '✂️ Обрыв увядших' }, { id: 'digging', label: '⛏️ Выкопка луковиц' }, { id: 'disease', label: '⚠️ Болезни' }],
+  narcissus:   [{ id: 'planting', label: '🧅 Посадка луковиц' }, { id: 'watering', label: '💧 Полив' }, { id: 'feeding', label: '🌿 Подкормка' }, { id: 'deadheading', label: '✂️ Обрыв увядших' }, { id: 'disease', label: '⚠️ Болезни' }],
+  hyacinth:    [{ id: 'planting', label: '🧅 Посадка луковиц' }, { id: 'watering', label: '💧 Полив' }, { id: 'feeding', label: '🌿 Подкормка' }, { id: 'digging', label: '⛏️ Выкопка луковиц' }, { id: 'disease', label: '⚠️ Болезни' }],
+  crocus:      [{ id: 'planting', label: '🧅 Посадка луковиц' }, { id: 'watering', label: '💧 Полив' }, { id: 'dividing', label: '🪻 Деление гнезда' }, { id: 'disease', label: '⚠️ Болезни' }],
 }
 
 // ============= Уведомления =============
