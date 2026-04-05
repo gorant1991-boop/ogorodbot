@@ -1,9 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
-import type { SubscriptionInfo } from './utils/types'
-import { isSubscriptionExpired } from './utils/constants'
+import type { DiaryEntry, OnboardingData, SubscriptionInfo } from './utils/types'
+import { trackExternalAnalyticsEvent } from './utils/webAnalytics'
+import { loadReviewAuth, REVIEW_USER_ID } from './utils/reviewAuth'
+import { loadTelegramAuth } from './utils/telegram'
+import { getVkAppId, loadVkAuth } from './utils/vk'
+import { hashIdentityToUserId } from '../shared/identity.ts'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+
+if (!SUPABASE_URL?.trim() || !SUPABASE_ANON_KEY?.trim()) {
+  throw new Error('Missing required Supabase env config: VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY')
+}
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
@@ -31,6 +39,8 @@ export interface YooKassaPaymentStatusResponse {
   status: string
   paid: boolean
   subscription: SubscriptionInfo | null
+  onboardingPatch?: Partial<OnboardingData> | null
+  offerId?: string | null
 }
 
 export interface TrackAnalyticsEventPayload {
@@ -40,100 +50,470 @@ export interface TrackAnalyticsEventPayload {
   metadata?: Record<string, unknown>
 }
 
+export interface NotificationPreview {
+  title: string
+  body: string
+  type?: string | null
+  created_at: string
+}
+
+export interface PlantPhotoDiagnosisResult {
+  summary: string
+  likelyIssue: string
+  confidence: 'low' | 'medium' | 'high'
+  checks: string[]
+  actionsNow: string[]
+  seekUrgentHelp: boolean
+  disclaimer: string
+}
+
+export interface AgronomistAnswerResponse {
+  answer: string
+}
+
+export interface WeeklyPlanTask {
+  crop: string
+  action: string
+  reason: string
+}
+
+export interface WeeklyPlanDay {
+  date: string
+  tasks: WeeklyPlanTask[]
+}
+
 export interface AdminStats {
   totalUsers: number
   newUsers7d: number
+  newUsers30d: number
+  activeProfiles7d: number
+  activeProfiles30d: number
   activePaidUsers: number
   diaryEntries: number
   successfulPayments: number
+  successfulPayments7d: number
   revenueTotal: number
+  revenue7d: number
   revenue30d: number
   authSuccesses7d: number
+  authSuccesses30d: number
   onboardingCompleted7d: number
+  onboardingCompleted30d: number
   checkoutOpened7d: number
+  checkoutOpened30d: number
   paymentSucceeded30d: number
   referralApplied7d: number
+  referralApplied30d: number
   vkShares7d: number
+  vkShares30d: number
+}
+
+export interface AddDiaryEntryOptions {
+  dedupeScope?: 'daily_task'
+}
+
+type DataApiAuth =
+  | {
+    provider: 'vk'
+    accessToken: string
+    userId: number
+    appId?: number
+  }
+  | {
+    provider: 'email'
+    accessToken: string
+  }
+  | {
+    provider: 'telegram'
+    id: number
+    first_name: string
+    last_name?: string
+    username?: string
+    photo_url?: string
+    auth_date: number
+    hash: string
+  }
+  | {
+    provider: 'review'
+    login: string
+    password: string
+  }
+
+function logDataApiError(action: string, error: unknown) {
+  console.error(`User data API error (${action}):`, error)
+}
+
+async function buildMatchingDataApiAuth(vkUserId: number): Promise<DataApiAuth | null> {
+  const reviewAuth = loadReviewAuth()
+  if (reviewAuth?.userId === vkUserId && vkUserId === REVIEW_USER_ID) {
+    return {
+      provider: 'review',
+      login: reviewAuth.login,
+      password: reviewAuth.password,
+    }
+  }
+
+  const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }))
+  const session = data.session
+  const sessionUserId = session?.user?.id ?? ''
+  const sessionAccessToken = session?.access_token ?? ''
+  const hashedEmailUserId = sessionUserId ? hashIdentityToUserId(`email:${sessionUserId}`) : 0
+
+  if (sessionAccessToken && sessionUserId && hashedEmailUserId === vkUserId) {
+    return {
+      provider: 'email',
+      accessToken: sessionAccessToken,
+    }
+  }
+
+  const telegramAuth = loadTelegramAuth()
+  if (telegramAuth?.id && telegramAuth.userId === vkUserId) {
+    return {
+      provider: 'telegram',
+      id: telegramAuth.id,
+      first_name: telegramAuth.first_name,
+      last_name: telegramAuth.last_name,
+      username: telegramAuth.username,
+      photo_url: telegramAuth.photo_url,
+      auth_date: telegramAuth.auth_date,
+      hash: telegramAuth.hash,
+    }
+  }
+
+  const vkAuth = loadVkAuth()
+  if (vkAuth?.accessToken && vkAuth.userId === vkUserId) {
+    return {
+      provider: 'vk',
+      accessToken: vkAuth.accessToken,
+      userId: vkAuth.userId,
+      appId: getVkAppId() || undefined,
+    }
+  }
+
+  return null
+}
+
+async function buildAnyDataApiAuth(): Promise<DataApiAuth | null> {
+  const reviewAuth = loadReviewAuth()
+  if (reviewAuth?.userId === REVIEW_USER_ID) {
+    return {
+      provider: 'review',
+      login: reviewAuth.login,
+      password: reviewAuth.password,
+    }
+  }
+
+  const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }))
+  const session = data.session
+  if (session?.access_token && session.user?.id) {
+    return {
+      provider: 'email',
+      accessToken: session.access_token,
+    }
+  }
+
+  const telegramAuth = loadTelegramAuth()
+  if (telegramAuth?.id) {
+    return {
+      provider: 'telegram',
+      id: telegramAuth.id,
+      first_name: telegramAuth.first_name,
+      last_name: telegramAuth.last_name,
+      username: telegramAuth.username,
+      photo_url: telegramAuth.photo_url,
+      auth_date: telegramAuth.auth_date,
+      hash: telegramAuth.hash,
+    }
+  }
+
+  const vkAuth = loadVkAuth()
+  if (vkAuth?.accessToken && vkAuth.userId) {
+    return {
+      provider: 'vk',
+      accessToken: vkAuth.accessToken,
+      userId: vkAuth.userId,
+      appId: getVkAppId() || undefined,
+    }
+  }
+
+  return null
+}
+
+async function invokeUserDataApi<T>(action: string, body: Record<string, unknown>, auth: DataApiAuth | null) {
+  if (!auth) {
+    throw new Error('Требуется вход через Telegram, VK ID или email')
+  }
+
+  const { data, error } = await supabase.functions.invoke<{ ok: boolean; data: T; error?: string }>('user-data', {
+    body: {
+      action,
+      auth,
+      ...body,
+    },
+  })
+
+  if (error) {
+    throw new Error(error.message || `Не удалось выполнить ${action}`)
+  }
+
+  if (!data?.ok) {
+    throw new Error(data?.error || `Не удалось выполнить ${action}`)
+  }
+
+  return data.data
 }
 
 export async function loadUserData(vkUserId: number) {
-  const { data, error } = await supabase
-    .from('garden_data')
-    .select('*')
-    .eq('vk_user_id', vkUserId)
-    .maybeSingle()
-  if (error) return null
-  return data
+  if (vkUserId === 1) return null
+
+  try {
+    const auth = await buildMatchingDataApiAuth(vkUserId)
+    return await invokeUserDataApi<Record<string, unknown> | null>('load_user_data', { vkUserId }, auth)
+  } catch (error) {
+    logDataApiError('load_user_data', error)
+    return null
+  }
 }
 
 export async function saveUserData(vkUserId: number, onboarding: object, plan: string) {
-  const { error } = await supabase
-    .from('garden_data')
-    .upsert({ vk_user_id: vkUserId, onboarding, plan }, { onConflict: 'vk_user_id' })
-  if (error) console.error('Supabase save error:', error)
+  if (vkUserId === 1) return
+
+  try {
+    const auth = await buildMatchingDataApiAuth(vkUserId)
+    await invokeUserDataApi('save_user_data', { vkUserId, onboarding, plan }, auth)
+  } catch (error) {
+    logDataApiError('save_user_data', error)
+  }
+}
+
+export async function applyReferral(vkUserId: number, pendingReferral: string, onboarding: object, plan: string) {
+  const auth = await buildMatchingDataApiAuth(vkUserId)
+  return await invokeUserDataApi<{ onboarding: OnboardingData; plan: string; referralApplied: boolean }>('apply_referral', {
+    vkUserId,
+    pendingReferral,
+    onboarding,
+    plan,
+  }, auth)
+}
+
+export async function loadNotifications(vkUserId: number, options: {
+  type?: string
+  excludeTypes?: string[]
+  limit?: number
+} = {}) {
+  if (vkUserId === 1) return []
+
+  try {
+    const auth = await buildMatchingDataApiAuth(vkUserId)
+    return await invokeUserDataApi<NotificationPreview[]>('load_notifications', {
+      vkUserId,
+      type: options.type ?? '',
+      excludeTypes: options.excludeTypes ?? [],
+      limit: options.limit ?? 20,
+    }, auth)
+  } catch (error) {
+    logDataApiError('load_notifications', error)
+    return []
+  }
 }
 
 export async function loadLastNotification(vkUserId: number) {
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('title, body, type, created_at')
-    .eq('vk_user_id', vkUserId)
-    .neq('type', 'subscription')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (error) return null
-  return data
-}
-
-export async function loadDiary(vkUserId: number, cropId?: string) {
-  let q = supabase
-    .from('diary')
-    .select('*')
-    .eq('vk_user_id', vkUserId)
-    .order('created_at', { ascending: false })
-    .limit(50)
-  if (cropId) q = q.eq('crop_id', cropId)
-  const { data, error } = await q
-  if (error) return []
-  return data
-}
-
-export async function addDiaryEntry(vkUserId: number, cropId: string | null, operation: string | null, text: string) {
-  const { error } = await supabase
-    .from('diary')
-    .insert({ vk_user_id: vkUserId, crop_id: cropId, operation, text })
-  if (error) console.error('Diary save error:', error)
-}
-
-export async function loadSeasons(vkUserId: number) {
-  const { data, error } = await supabase
-    .from('seasons')
-    .select('*')
-    .eq('vk_user_id', vkUserId)
-    .order('year', { ascending: false })
-  if (error) return []
-  return data
-}
-
-export async function saveSeasonSnapshot(vkUserId: number, year: number, snapshot: object, summary?: string) {
-  const { error } = await supabase
-    .from('seasons')
-    .upsert({ vk_user_id: vkUserId, year, snapshot, summary }, { onConflict: 'vk_user_id,year' })
-  if (error) console.error('Season save error:', error)
+  const notifications = await loadNotifications(vkUserId, {
+    excludeTypes: ['subscription', 'weekly_plan_access'],
+    limit: 1,
+  })
+  return notifications[0] ?? null
 }
 
 export async function loadSubscriptionNotif(vkUserId: number) {
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('title, body, type, created_at')
-    .eq('vk_user_id', vkUserId)
-    .eq('type', 'subscription')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (error) return null
-  return data
+  const notifications = await loadNotifications(vkUserId, {
+    type: 'subscription',
+    limit: 1,
+  })
+  return notifications[0] ?? null
+}
+
+export async function loadDiary(vkUserId: number, cropId?: string) {
+  if (vkUserId === 1) {
+    try {
+      const raw = localStorage.getItem('ogorodbot_guest_bundle')
+      if (!raw) return []
+      const bundle = JSON.parse(raw) as { diaryEntries?: DiaryEntry[] }
+      const entries = bundle.diaryEntries ?? []
+      return cropId ? entries.filter((e: DiaryEntry) => e.crop_id === cropId) : entries
+    } catch {
+      return []
+    }
+  }
+
+  try {
+    const auth = await buildMatchingDataApiAuth(vkUserId)
+    return await invokeUserDataApi<DiaryEntry[]>('load_diary', {
+      vkUserId,
+      cropId: cropId ?? '',
+      limit: 50,
+    }, auth)
+  } catch (error) {
+    logDataApiError('load_diary', error)
+    return []
+  }
+}
+
+export async function addDiaryEntry(
+  vkUserId: number,
+  cropId: string | null,
+  operation: string | null,
+  text: string,
+  options: AddDiaryEntryOptions = {},
+) {
+  if (vkUserId === 1) {
+    return {
+      id: -Date.now(),
+      vk_user_id: 1,
+      crop_id: cropId,
+      operation: operation,
+      text,
+      created_at: new Date().toISOString(),
+    } as DiaryEntry
+  }
+
+  try {
+    const auth = await buildMatchingDataApiAuth(vkUserId)
+    return await invokeUserDataApi<DiaryEntry>('add_diary_entry', {
+      vkUserId,
+      cropId,
+      operation,
+      text,
+      dedupeScope: options.dedupeScope ?? '',
+    }, auth)
+  } catch (error) {
+    logDataApiError('add_diary_entry', error)
+    throw (error instanceof Error ? error : new Error('Не удалось сохранить запись в дневник'))
+  }
+}
+
+export async function deleteDiaryEntry(vkUserId: number, entryId: number) {
+  if (vkUserId === 1) return false
+
+  try {
+    const auth = await buildMatchingDataApiAuth(vkUserId)
+    await invokeUserDataApi('delete_diary_entry', { vkUserId, entryId }, auth)
+    return true
+  } catch (error) {
+    logDataApiError('delete_diary_entry', error)
+    return false
+  }
+}
+
+export async function deleteAccount(vkUserId: number) {
+  if (vkUserId === 1) return false
+
+  try {
+    const auth = await buildMatchingDataApiAuth(vkUserId)
+    await invokeUserDataApi('delete_account', { vkUserId }, auth)
+    return true
+  } catch (error) {
+    logDataApiError('delete_account', error)
+    return false
+  }
+}
+
+export async function analyzePlantPhoto(input: {
+  vkUserId: number
+  imageDataUrl: string
+  cropId?: string
+  cropName?: string
+  city?: string
+  note?: string
+  weather?: {
+    temp?: number
+    humidity?: number
+    desc?: string
+  }
+}) {
+  if (input.vkUserId === 1) {
+    throw new Error('Сначала войдите через Telegram, VK ID или email, чтобы использовать фотодиагностику')
+  }
+
+  try {
+    const auth = await buildMatchingDataApiAuth(input.vkUserId)
+    return await invokeUserDataApi<PlantPhotoDiagnosisResult>('analyze_plant_photo', {
+      vkUserId: input.vkUserId,
+      imageDataUrl: input.imageDataUrl,
+      cropId: input.cropId ?? '',
+      cropName: input.cropName ?? '',
+      city: input.city ?? '',
+      note: input.note ?? '',
+      weather: input.weather ?? {},
+    }, auth)
+  } catch (error) {
+    logDataApiError('analyze_plant_photo', error)
+    throw (error instanceof Error ? error : new Error('Не удалось разобрать фото растения'))
+  }
+}
+
+export async function requestAgronomistAnswer(input: {
+  vkUserId: number
+  question: string
+  gardenContext: OnboardingData
+  plan: string
+}) {
+  if (input.vkUserId === 1) {
+    throw new Error('Сначала войдите через Telegram, VK ID или email, чтобы написать агроному')
+  }
+
+  try {
+    const auth = await buildMatchingDataApiAuth(input.vkUserId)
+    return await invokeUserDataApi<AgronomistAnswerResponse>('ask_agronomist', {
+      vkUserId: input.vkUserId,
+      question: input.question,
+      gardenContext: input.gardenContext,
+      plan: input.plan,
+    }, auth)
+  } catch (error) {
+    logDataApiError('ask_agronomist', error)
+    throw (error instanceof Error ? error : new Error('Не удалось получить ответ агронома'))
+  }
+}
+
+export async function loadWeeklyPlan(vkUserId: number, gardenContext: OnboardingData) {
+  if (vkUserId === 1) {
+    return { plan: [] as WeeklyPlanDay[] }
+  }
+
+  try {
+    const auth = await buildMatchingDataApiAuth(vkUserId)
+    return await invokeUserDataApi<{ plan?: WeeklyPlanDay[] }>('load_weekly_plan', {
+      vkUserId,
+      gardenContext,
+    }, auth)
+  } catch (error) {
+    logDataApiError('load_weekly_plan', error)
+    throw (error instanceof Error ? error : new Error('Не удалось загрузить недельный план'))
+  }
+}
+
+export async function loadSeasons(vkUserId: number) {
+  if (vkUserId === 1) return []
+
+  try {
+    const auth = await buildMatchingDataApiAuth(vkUserId)
+    return await invokeUserDataApi('load_seasons', { vkUserId }, auth)
+  } catch (error) {
+    logDataApiError('load_seasons', error)
+    return []
+  }
+}
+
+export async function saveSeasonSnapshot(vkUserId: number, year: number, snapshot: object, summary?: string) {
+  if (vkUserId === 1) return
+
+  try {
+    const auth = await buildMatchingDataApiAuth(vkUserId)
+    await invokeUserDataApi('save_season_snapshot', { vkUserId, year, snapshot, summary }, auth)
+  } catch (error) {
+    logDataApiError('save_season_snapshot', error)
+  }
 }
 
 export async function createYooKassaPayment(payload: CreateYooKassaPaymentRequest) {
@@ -158,7 +538,7 @@ export async function sendEmailMagicLink(email: string) {
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: window.location.origin,
+      emailRedirectTo: 'https://ogorod-ai.ru',
     },
   })
   if (error) throw new Error(error.message || 'Не удалось отправить ссылку для входа')
@@ -181,76 +561,49 @@ export async function signOutEmailAuth() {
 }
 
 export async function trackAnalyticsEvent(payload: TrackAnalyticsEventPayload) {
-  const { error } = await supabase
-    .from('analytics_events')
-    .insert({
-      vk_user_id: payload.vkUserId,
-      event_type: payload.eventType,
-      source: payload.source ?? null,
-      metadata: payload.metadata ?? {},
-    })
+  trackExternalAnalyticsEvent(payload)
 
-  if (error) console.error('Analytics save error:', error)
+  if (payload.vkUserId === 1) return
+
+  try {
+    const auth = await buildMatchingDataApiAuth(payload.vkUserId)
+    if (!auth) return
+
+    await invokeUserDataApi('track_analytics_event', {
+      vkUserId: payload.vkUserId,
+      eventType: payload.eventType,
+      source: payload.source ?? '',
+      metadata: payload.metadata ?? {},
+    }, auth)
+  } catch (error) {
+    logDataApiError('track_analytics_event', error)
+  }
+}
+
+export async function sendTestTelegramNotification(vkUserId: number) {
+  if (vkUserId === 1) return false
+
+  try {
+    const auth = await buildMatchingDataApiAuth(vkUserId)
+    await invokeUserDataApi('send_test_telegram', { vkUserId }, auth)
+    return true
+  } catch (error) {
+    logDataApiError('send_test_telegram', error)
+    throw (error instanceof Error ? error : new Error('Не удалось отправить тест в Telegram'))
+  }
 }
 
 export async function loadAdminStats(): Promise<AdminStats> {
-  const now = Date.now()
-  const since7d = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString()
-  const since30d = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const auth = await buildAnyDataApiAuth()
+  return await invokeUserDataApi<AdminStats>('load_admin_stats', {}, auth)
+}
 
-  const [
-    totalUsersRes,
-    newUsersRes,
-    diaryRes,
-    paidPaymentsRes,
-    paidPayments30dRes,
-    gardenRowsRes,
-    eventsRes,
-  ] = await Promise.all([
-    supabase.from('garden_data').select('*', { count: 'exact', head: true }),
-    supabase.from('garden_data').select('*', { count: 'exact', head: true }).gte('created_at', since7d),
-    supabase.from('diary').select('*', { count: 'exact', head: true }),
-    supabase.from('billing_payments').select('amount, created_at').eq('status', 'succeeded'),
-    supabase.from('billing_payments').select('amount, created_at').eq('status', 'succeeded').gte('created_at', since30d),
-    supabase.from('garden_data').select('plan, onboarding'),
-    supabase.from('analytics_events').select('event_type, created_at').gte('created_at', since30d),
-  ])
-
-  const totalUsers = totalUsersRes.count ?? 0
-  const newUsers7d = newUsersRes.count ?? 0
-  const diaryEntries = diaryRes.count ?? 0
-
-  const successfulPayments = (paidPaymentsRes.data ?? []).length
-  const revenueTotal = (paidPaymentsRes.data ?? []).reduce((sum, row) => sum + Number(row.amount ?? 0), 0)
-  const revenue30d = (paidPayments30dRes.data ?? []).reduce((sum, row) => sum + Number(row.amount ?? 0), 0)
-  const paymentSucceeded30d = (paidPayments30dRes.data ?? []).length
-
-  const activePaidUsers = (gardenRowsRes.data ?? []).reduce((count, row) => {
-    const onboarding = row.onboarding as { subscription?: SubscriptionInfo | null } | null
-    const subscription = onboarding?.subscription ?? null
-    if (subscription && !isSubscriptionExpired(subscription)) {
-      return count + 1
-    }
-    return count
-  }, 0)
-
-  const eventRows = eventsRes.data ?? []
-  const countEvents = (eventType: string, sinceIso: string) =>
-    eventRows.filter(row => row.event_type === eventType && row.created_at >= sinceIso).length
-
-  return {
-    totalUsers,
-    newUsers7d,
-    activePaidUsers,
-    diaryEntries,
-    successfulPayments,
-    revenueTotal,
-    revenue30d,
-    authSuccesses7d: countEvents('auth_success', since7d),
-    onboardingCompleted7d: countEvents('onboarding_complete', since7d),
-    checkoutOpened7d: countEvents('checkout_opened', since7d),
-    paymentSucceeded30d,
-    referralApplied7d: countEvents('referral_applied', since7d),
-    vkShares7d: countEvents('vk_share', since7d),
-  }
+export async function verifyReviewLogin(login: string, password: string) {
+  return await invokeUserDataApi<{ ok: true }>('load_user_data', {
+    vkUserId: REVIEW_USER_ID,
+  }, {
+    provider: 'review',
+    login: login.trim(),
+    password,
+  })
 }
