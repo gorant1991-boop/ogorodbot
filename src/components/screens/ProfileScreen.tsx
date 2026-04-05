@@ -1,35 +1,79 @@
 import { useEffect, useState } from 'react'
-import type { DiaryEntry, OnboardingData, Plan, Season } from '../../utils/types'
-import { FAQ_ITEMS, NOTIF_CHANNELS, GROW_OPTIONS, OBJECT_LIMITS, buildSubscriptionOffers, formatDateLabel, formatPrice, getSubscriptionNotice, getSubscriptionStatusLabel, makeObject } from '../../utils/constants'
+import type { DiaryEntry, OnboardingData, Plan, Season, SubscriptionInfo } from '../../utils/types'
+import { FAQ_ITEMS, NOTIF_CHANNELS, GROW_OPTIONS, OBJECT_LIMITS, buildObjectName, buildSubscriptionOffers, formatDateLabel, formatPrice, getObjectNamePlaceholder, getSubscriptionNotice, getSubscriptionStatusLabel, hasWeeklyPlannerAccess, makeObject } from '../../utils/constants'
 import { shareGardenToVk } from '../../utils/shareCards'
+import { getTelegramDisplayName, type TelegramAuthState } from '../../utils/telegram'
 import type { VkAuthState } from '../../utils/vk'
-import type { AdminStats, EmailAuthState } from '../../supabase'
+import type { AdminStats, EmailAuthState, NotificationPreview } from '../../supabase'
 import { SeasonsScreen } from './SeasonsScreen'
 import { exportCSV, exportHTML } from '../../utils/export'
-import { createYooKassaPayment, getYooKassaPaymentStatus, loadAdminStats, loadDiary, loadSeasons, trackAnalyticsEvent } from '../../supabase'
-import { supabase } from '../../supabase'
+import { createYooKassaPayment, getYooKassaPaymentStatus, loadAdminStats, loadDiary, loadNotifications, loadSeasons, sendTestTelegramNotification, trackAnalyticsEvent } from '../../supabase'
 import { DeleteAccountButton } from '../modals'
 
-interface NotificationRow {
-  created_at: string
-  title: string
-  body: string
-}
+type NotificationRow = NotificationPreview
 
 const OWNER_VK_ID = 16761047
 const OWNER_EMAILS = ['gorant1991@gmail.com']
+const TELEGRAM_TEST_OK_PREFIX = 'ogorodbot_tg_test_ok:'
+const GENERIC_TOOLS = new Set(['🪣 Лейка', '🧯 Шланг', 'Лейка', 'Шланг'])
+const TOOL_OPTIONS = [
+  '🌡️ Термометр',
+  '🌱 Термометр почвы',
+  '💧 Влагомер',
+  '🧪 pH-метр',
+  '🧂 EC/TDS-метр',
+  '🚿 Опрыскиватель',
+  '💦 Капельный полив',
+  '🪵 Мульча',
+  '🧵 Агроволокно',
+  '🏕️ Дуги и плёнка',
+]
 
-export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId, vkAuth, emailAuth, vkLoginAvailable, onVkLogin, onVkLogout }: {
+function buildBonusSubscription(subscription: SubscriptionInfo | null | undefined, days: number): SubscriptionInfo {
+  const now = new Date()
+  const activeSubscription = subscription && new Date(subscription.endsAt).getTime() > now.getTime()
+    ? subscription
+    : null
+  const level = activeSubscription?.level === 'pro' ? 'pro' : 'base'
+  const monthlyPrice = level === 'pro' ? 300 : 150
+  const baseDate = activeSubscription ? new Date(activeSubscription.endsAt) : now
+  baseDate.setDate(baseDate.getDate() + days)
+
+  return {
+    level,
+    period: activeSubscription?.period ?? 'monthly',
+    status: 'active',
+    startsAt: activeSubscription?.startsAt || now.toISOString(),
+    endsAt: baseDate.toISOString(),
+    monthlyPrice: activeSubscription?.monthlyPrice || monthlyPrice,
+    amount: activeSubscription?.amount ?? 0,
+    baseAmount: activeSubscription?.baseAmount ?? 0,
+    discountPercent: activeSubscription?.discountPercent ?? 0,
+    source: activeSubscription?.source ?? 'manual',
+  }
+}
+
+export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId, vkAuth, telegramAuth, emailAuth, vkLoginAvailable, onVkLogin, onVkLogout, offlineBundleSavedAt, offlinePreparing, offlineMode, onPrepareOffline, ownerAnalyticsUrl, onOpenOwnerAnalytics, helpHintsEnabled, onToggleHelpHints, onReplayIntro }: {
   data: OnboardingData
   plan: Plan
   onChangePlan: (p: Plan) => void
   onUpdateData: (patch: Partial<OnboardingData>) => void
   vkUserId: number
   vkAuth: VkAuthState | null
+  telegramAuth: TelegramAuthState | null
   emailAuth: EmailAuthState | null
   vkLoginAvailable: boolean
   onVkLogin: () => void
   onVkLogout: () => void
+  offlineBundleSavedAt: string | null
+  offlinePreparing: boolean
+  offlineMode: boolean
+  onPrepareOffline: () => void
+  ownerAnalyticsUrl: string
+  onOpenOwnerAnalytics: () => void
+  helpHintsEnabled: boolean
+  onToggleHelpHints: () => void
+  onReplayIntro: () => void
 }) {
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [checkoutOfferId, setCheckoutOfferId] = useState<string | null>(null)
@@ -40,12 +84,15 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
   const [checkoutError, setCheckoutError] = useState('')
   const [editCity, setEditCity] = useState(false)
   const [cityVal, setCityVal] = useState(data.city)
+  const [editDisplayName, setEditDisplayName] = useState(false)
+  const [displayNameVal, setDisplayNameVal] = useState(data.displayName)
+  const [addressStyleDraft, setAddressStyleDraft] = useState(data.addressStyle)
   const [editExp, setEditExp] = useState(false)
   const [showAddObject, setShowAddObject] = useState(false)
   const [editObjectId, setEditObjectId] = useState<string | null>(null)
   const [showFaq, setShowFaq] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const [vkSharing, setVkSharing] = useState<'garden' | 'premium' | null>(null)
+  const [vkSharing, setVkSharing] = useState<'vk_post' | null>(null)
   const [referralInput, setReferralInput] = useState('')
   const [openFaqIdx, setOpenFaqIdx] = useState<number | null>(null)
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null)
@@ -55,24 +102,47 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
   const [notifEveningDraft, setNotifEveningDraft] = useState(data.notifEvening)
   const [notificationEmailDraft, setNotificationEmailDraft] = useState(data.notificationEmail)
   const [notifChannelsDraft, setNotifChannelsDraft] = useState(data.notifChannels)
+  const [tgTestSending, setTgTestSending] = useState(false)
+  const [tgTestOk, setTgTestOk] = useState(() => {
+    try {
+      return localStorage.getItem(`${TELEGRAM_TEST_OK_PREFIX}${vkUserId}`) === '1'
+    } catch {
+      return false
+    }
+  })
+  const telegramLinked = Boolean(data.telegramChatId || telegramAuth?.id)
   const expLabel = { beginner: '🌱 Новичок', amateur: '🌿 Любитель', experienced: '🧑‍🌾 Опытный', expert: '🏆 Эксперт' }[data.experience] ?? '—'
   const offers = buildSubscriptionOffers()
+  const weeklyPlanOffer = offers.find(item => item.kind === 'weekly_plan') ?? null
+  const subscriptionOffers = offers.filter(item => item.kind === 'subscription')
   const currentSubscription = data.subscription ?? null
+  const legacyPaidAccess = !currentSubscription && plan !== 'free'
   const subscriptionNotice = getSubscriptionNotice(currentSubscription)
+  const weeklyPlannerAccess = hasWeeklyPlannerAccess(data, plan)
   const isOwner = vkUserId === OWNER_VK_ID || Boolean(emailAuth?.email && OWNER_EMAILS.includes(emailAuth.email.toLowerCase()))
   const currentTitle = plan === 'free'
     ? 'Бесплатный тариф'
     : currentSubscription
       ? getSubscriptionStatusLabel(currentSubscription)
-      : (plan === 'base' ? 'Базовая' : 'Про')
+      : `${plan === 'base' ? 'Базовая' : 'Про'} · доступ активен`
   const currentMeta = currentSubscription
     ? `До ${formatDateLabel(currentSubscription.endsAt)} · оплачено ${formatPrice(currentSubscription.amount)}${currentSubscription.discountPercent > 0 ? ` · скидка ${currentSubscription.discountPercent}%` : ''}`
     : plan === 'free'
-      ? '10 культур, 1 объект, базовые советы агронома'
-      : 'Активный доступ сохранён. Здесь отображаются срок и сумма после успешной оплаты через ЮKassa.'
+      ? '10 культур, 3 объекта, базовые советы агронома'
+      : 'Платный доступ уже активен. Если детали оплаты ниже не показаны, это старый или неполный профиль подписки, а не потеря тарифа.'
+  const weeklyPlannerMeta = plan === 'pro'
+    ? 'План на 7 дней уже входит в Про и открывается без отдельной оплаты.'
+    : weeklyPlannerAccess && data.weeklyPlanAccessUntil
+      ? `Разовый доступ активен до ${formatDateLabel(data.weeklyPlanAccessUntil)}. Его можно продлить отдельно от подписки.`
+      : 'Можно купить отдельно за 99 ₽ и не оформлять Базовую или Про подписку.'
+  const checkoutOffer = offers.find(item => item.id === checkoutOfferId) ?? null
 
   function normalizeNotificationEmail(value: string) {
     return value.trim().toLowerCase()
+  }
+
+  function normalizeDisplayName(value: string) {
+    return value.replace(/\s+/g, ' ').trim().slice(0, 30)
   }
 
   function isValidNotificationEmail(value: string) {
@@ -84,6 +154,20 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
   function handleChannelToggle(channelId: string, active: boolean) {
     setNotifChannelsDraft(prev => active ? prev.filter(x => x !== channelId) : [...prev, channelId])
   }
+
+  function handleToolToggle(toolName: string) {
+    const nextTools = data.tools.includes(toolName)
+      ? data.tools.filter(item => item !== toolName)
+      : [...data.tools, toolName]
+    onUpdateData({ tools: nextTools })
+  }
+
+  useEffect(() => {
+    const sanitizedTools = data.tools.filter(tool => !GENERIC_TOOLS.has(tool))
+    if (sanitizedTools.length !== data.tools.length) {
+      onUpdateData({ tools: sanitizedTools })
+    }
+  }, [data.tools, onUpdateData])
 
   function saveNotificationSettings() {
     const normalizedEmail = normalizeNotificationEmail(notificationEmailDraft)
@@ -98,6 +182,10 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
     }
     if (!normalizedEmail) {
       nextChannels = nextChannels.filter(channel => channel !== 'email')
+    }
+    if (nextChannels.includes('tg') && !telegramLinked) {
+      window.alert('Сначала войдите через Telegram, чтобы бот мог присылать вам уведомления.')
+      return
     }
 
     onUpdateData({
@@ -127,8 +215,8 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
       void trackAnalyticsEvent({
         vkUserId,
         eventType: 'checkout_opened',
-        source: 'subscription',
-        metadata: { offerId },
+        source: offer.kind,
+        metadata: { offerId, kind: offer.kind },
       })
       const result = await createYooKassaPayment({
         offerId,
@@ -188,44 +276,29 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
     onChangePlan('free')
   }
 
-  async function handleVkShare(theme: 'garden' | 'premium') {
-    setVkSharing(theme)
+  async function handleVkShare() {
+    setVkSharing('vk_post')
     try {
-      await shareGardenToVk(data, plan, theme)
+      await shareGardenToVk(data, plan, 'garden')
       void trackAnalyticsEvent({
         vkUserId,
         eventType: 'vk_share',
-        source: theme,
-        metadata: { theme, plan },
+        source: 'garden',
+        metadata: { theme: 'garden', plan },
       })
       const lastPromoShareAt = data.lastPromoShareAt ? new Date(data.lastPromoShareAt) : null
       const oneDayMs = 24 * 60 * 60 * 1000
       const canGrantShareBonus = !lastPromoShareAt || (Date.now() - lastPromoShareAt.getTime()) >= oneDayMs
       if (canGrantShareBonus) {
+        const nextSubscription = buildBonusSubscription(data.subscription, 1)
+        const bonusLabel = nextSubscription.level === 'pro' ? 'текущего тарифа' : 'Базовой подписки'
         onUpdateData({
           promoPostShares: (data.promoPostShares ?? 0) + 1,
           lastPromoShareAt: new Date().toISOString(),
-          subscription: {
-            level: 'base',
-            period: 'monthly',
-            status: 'active',
-            startsAt: new Date().toISOString(),
-            endsAt: (() => {
-              const base = data.subscription && new Date(data.subscription.endsAt).getTime() > Date.now()
-                ? new Date(data.subscription.endsAt)
-                : new Date()
-              base.setDate(base.getDate() + 1)
-              return base.toISOString()
-            })(),
-            monthlyPrice: 150,
-            amount: data.subscription?.amount ?? 0,
-            baseAmount: data.subscription?.baseAmount ?? 0,
-            discountPercent: data.subscription?.discountPercent ?? 0,
-            source: 'manual',
-          },
+          subscription: nextSubscription,
         })
-        if (plan === 'free') onChangePlan('base')
-        window.alert('За пост в VK начислен бонус: +1 день Базовой подписки.')
+        onChangePlan(nextSubscription.level)
+        window.alert(`За пост в VK начислен бонус: +1 день ${bonusLabel}.`)
       } else {
         window.alert('Бонус за VK-пост уже начислялся сегодня. Следующий бонус можно получить завтра.')
       }
@@ -257,7 +330,17 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
     setNotifEveningDraft(data.notifEvening)
     setNotificationEmailDraft(data.notificationEmail)
     setNotifChannelsDraft(data.notifChannels)
-  }, [data.notifMorning, data.notifEvening, data.notificationEmail, data.notifChannels])
+    setDisplayNameVal(data.displayName)
+    setAddressStyleDraft(data.addressStyle)
+  }, [data.notifMorning, data.notifEvening, data.notificationEmail, data.notifChannels, data.displayName, data.addressStyle])
+
+  useEffect(() => {
+    try {
+      setTgTestOk(localStorage.getItem(`${TELEGRAM_TEST_OK_PREFIX}${vkUserId}`) === '1')
+    } catch {
+      setTgTestOk(false)
+    }
+  }, [vkUserId])
 
   async function copyReferralLink() {
     const link = `${window.location.origin}?ref=${encodeURIComponent(data.referralCode || `OG-${vkUserId}`)}`
@@ -269,6 +352,7 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
     if (!checkoutOpen || !checkoutToken) return
 
     const confirmationToken = checkoutToken
+    const widgetHostId = 'yookassa-payment-widget'
     let widget: YooMoneyCheckoutWidgetInstance | null = null
     let canceled = false
 
@@ -295,7 +379,7 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
 
       if (canceled || !window.YooMoneyCheckoutWidget) return
 
-      const container = document.getElementById('yookassa-payment-widget')
+      const container = document.getElementById(widgetHostId)
       if (!container) return
       container.innerHTML = ''
       widget = new window.YooMoneyCheckoutWidget({
@@ -306,7 +390,12 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
           setCheckoutError('ЮKassa вернула ошибку. Попробуйте ещё раз.')
         },
       })
-      widget.render(container)
+      widget.render(widgetHostId)
+      setTimeout(() => {
+        if (!canceled) {
+          document.getElementById(widgetHostId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }, 200)
     }
 
     void renderWidget().catch((error: unknown) => {
@@ -317,7 +406,7 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
     return () => {
       canceled = true
       widget?.destroy?.()
-      const container = document.getElementById('yookassa-payment-widget')
+      const container = document.getElementById(widgetHostId)
       if (container) container.innerHTML = ''
     }
   }, [checkoutOpen, checkoutToken])
@@ -332,18 +421,28 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
       try {
         const result = await getYooKassaPaymentStatus(checkoutPaymentId, vkUserId)
         if (canceled) return
-        if (result.status === 'succeeded' && result.subscription) {
-          onUpdateData({ subscription: result.subscription })
-          onChangePlan(result.subscription.level)
+        const paidOffer = offers.find(item => item.id === (result.offerId ?? checkoutOfferId ?? '')) ?? checkoutOffer
+        if (result.status === 'succeeded') {
+          if (result.subscription) {
+            onUpdateData({
+              ...(result.onboardingPatch ?? {}),
+              subscription: result.subscription,
+            })
+            onChangePlan(result.subscription.level)
+          } else if (result.onboardingPatch) {
+            onUpdateData(result.onboardingPatch)
+          }
           void trackAnalyticsEvent({
             vkUserId,
             eventType: 'payment_succeeded',
-            source: 'yookassa',
+            source: paidOffer?.kind ?? 'yookassa',
             metadata: {
               paymentId: checkoutPaymentId,
-              level: result.subscription.level,
-              period: result.subscription.period,
-              amount: result.subscription.amount,
+              offerId: result.offerId ?? checkoutOfferId,
+              kind: paidOffer?.kind ?? null,
+              level: result.subscription?.level ?? null,
+              period: result.subscription?.period ?? null,
+              amount: result.subscription?.amount ?? paidOffer?.amount ?? null,
             },
           })
           setCheckoutStatus('succeeded')
@@ -371,7 +470,7 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
       canceled = true
       window.clearInterval(timer)
     }
-  }, [checkoutOpen, checkoutPaymentId, checkoutStatus, onChangePlan, onUpdateData, vkUserId])
+  }, [checkoutOffer, checkoutOfferId, checkoutOpen, checkoutPaymentId, checkoutStatus, offers, onChangePlan, onUpdateData, vkUserId])
 
   useEffect(() => {
     if (!isOwner) return
@@ -394,9 +493,6 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
       canceled = true
     }
   }, [isOwner])
-
-  const checkoutOffer = offers.find(item => item.id === checkoutOfferId) ?? null
-
   return (
     <div className="tab-content">
       {checkoutOpen && (
@@ -416,13 +512,19 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
               </div>
             )}
             <div className="payment-hint">
-              После успешной оплаты тариф включится автоматически и появится в вашем профиле.
+              {checkoutOffer?.kind === 'weekly_plan'
+                ? 'После оплаты откроется отдельный доступ к Плану на 7 дней, даже если у вас бесплатный тариф.'
+                : 'После успешной оплаты тариф включится автоматически и появится в вашем профиле.'}
             </div>
             {checkoutError && <div className="payment-error">{checkoutError}</div>}
             {checkoutStatus === 'succeeded' ? (
               <div className="payment-success">
                 <div className="payment-success-title">Оплата прошла</div>
-                <div className="payment-success-sub">Подписка уже активирована.</div>
+                <div className="payment-success-sub">
+                  {checkoutOffer?.kind === 'weekly_plan'
+                    ? 'Доступ к Плану на 7 дней уже открыт.'
+                    : 'Подписка уже активирована.'}
+                </div>
                 <button className="btn-upgrade-full" onClick={closeCheckout}>Готово</button>
               </div>
             ) : (
@@ -475,7 +577,7 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
                   Лимит объектов достигнут
                 </div>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)' }}>
-                  {plan === 'free' ? 'Бесплатно — 1 объект. Перейдите на Базовую (3 объекта)' : 'Базовая — 3 объекта. Перейдите на Про для неограниченного количества'}
+                  {plan === 'free' ? 'Бесплатно — до 3 объектов. Перейдите на Базовую (до 8 объектов)' : 'Базовая — до 8 объектов. Перейдите на Про для неограниченного количества'}
                 </div>
               </div>
             ) : (
@@ -484,7 +586,7 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
                   {GROW_OPTIONS.map(o => (
                     <button key={o.id} className="ob-card" onClick={() => {
                       const count = data.gardenObjects.filter(x => x.type === o.id).length
-                      const name = count === 0 ? o.title : `${o.title} ${count + 1}`
+                      const name = buildObjectName(o.id, count + 1)
                       onUpdateData({ gardenObjects: [...data.gardenObjects, makeObject(o.id, name)] })
                       setShowAddObject(false)
                     }}>
@@ -512,11 +614,14 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
               <button className="modal-close" onClick={() => setEditObjectId(null)}>✕</button>
             </div>
             <div className="modal-section-label">Название</div>
+            <div className="section-helper" style={{ padding: '0 0 8px' }}>
+              Пишите по-человечески, чтобы потом было легко ориентироваться: `грядка у теплицы`, `парник за домом`, `левая теплица`.
+            </div>
             <input
               className="profile-edit-input"
               value={editingObject.name}
               onChange={e => updateObject(editingObject.uid, { name: e.target.value })}
-              placeholder="Название объекта"
+              placeholder={getObjectNamePlaceholder(editingObject.type)}
             />
             <div className="modal-section-label">Состав / субстрат</div>
             <input
@@ -611,24 +716,85 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
       <div className="profile-card">
         <div className="vk-connect-card">
           <div>
-            <div className="vk-connect-title">VK ID</div>
+            <div className="vk-connect-title">Аккаунт</div>
             <div className="vk-connect-sub">
               {vkAuth
                 ? `Подключён аккаунт VK · ID ${vkAuth.userId}${vkAuth.email ? ` · ${vkAuth.email}` : ''}`
+                : telegramAuth
+                  ? `Вы вошли через Telegram · ${getTelegramDisplayName(telegramAuth)}${telegramAuth.username ? ` · @${telegramAuth.username}` : ''}`
                 : emailAuth
                   ? `Вы вошли по email · ${emailAuth.email}`
                 : vkLoginAvailable
-                  ? 'Подключите VK, чтобы сайт узнавал ваш аккаунт и открывался как доверенное web-приложение.'
-                  : 'Добавьте VITE_VK_APP_ID в .env, чтобы включить вход через VK ID.'}
+                  ? 'Подключите удобный вход, чтобы огород открывался с вашими данными на любом устройстве.'
+                  : 'Сейчас включён только email-вход. VK и Telegram можно добавить через .env и BotFather.'}
             </div>
           </div>
-          {vkAuth || emailAuth ? (
+          {vkAuth || telegramAuth || emailAuth ? (
             <button className="vk-connect-btn secondary" onClick={onVkLogout}>Выйти</button>
           ) : (
             <button className="vk-connect-btn" disabled={!vkLoginAvailable} onClick={onVkLogin}>Войти через VK</button>
           )}
         </div>
 
+        {editDisplayName ? (
+          <div className="profile-edit-stack">
+            <div className="profile-edit-row">
+              <input
+                className="profile-edit-input"
+                value={displayNameVal}
+                onChange={e => setDisplayNameVal(e.target.value.slice(0, 30))}
+                placeholder="Как к вам обращаться"
+                autoFocus
+                maxLength={30}
+              />
+              <button
+                className="profile-edit-save"
+                onClick={() => {
+                  onUpdateData({
+                    displayName: normalizeDisplayName(displayNameVal),
+                    addressStyle: addressStyleDraft,
+                  })
+                  setEditDisplayName(false)
+                }}
+              >
+                ✓
+              </button>
+              <button
+                className="profile-edit-cancel"
+                onClick={() => {
+                  setDisplayNameVal(data.displayName)
+                  setAddressStyleDraft(data.addressStyle)
+                  setEditDisplayName(false)
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="profile-edit-inline-setting">
+              <span className="profile-label">🗣️ Стиль обращения</span>
+              <div className="profile-address-options">
+                <button
+                  className={`profile-address-btn ${addressStyleDraft === 'informal' ? 'active' : ''}`}
+                  onClick={() => setAddressStyleDraft('informal')}
+                >
+                  на ты
+                </button>
+                <button
+                  className={`profile-address-btn ${addressStyleDraft === 'formal' ? 'active' : ''}`}
+                  onClick={() => setAddressStyleDraft('formal')}
+                >
+                  на вы
+                </button>
+              </div>
+            </div>
+            <div className="profile-edit-hint">{displayNameVal.length}/30 · можно оставить пустым</div>
+          </div>
+        ) : (
+          <div className="profile-row profile-row-tap" onClick={() => { setDisplayNameVal(data.displayName); setAddressStyleDraft(data.addressStyle); setEditDisplayName(true) }}>
+            <span className="profile-label">🙌 Имя в приложении</span>
+            <span className="profile-val">{data.displayName || 'Не задано'} · {data.addressStyle === 'formal' ? 'на вы' : 'на ты'} <span className="profile-edit-icon">✏️</span></span>
+          </div>
+        )}
         {editCity ? (
           <div className="profile-edit-row">
             <input className="profile-edit-input" value={cityVal} onChange={e => setCityVal(e.target.value)} placeholder="Введите город" autoFocus />
@@ -652,7 +818,7 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
             <span className="profile-val">
               {data.gardenObjects.map(o => GROW_OPTIONS.find(g => g.id === o.type)?.icon).join(' ') || '—'}
             </span>
-            <button className="profile-add-btn" onClick={() => setShowAddObject(true)}>+</button>
+            <button className="profile-add-btn" onClick={() => setShowAddObject(true)} aria-label="Добавить объект огорода" title="Добавить объект огорода">+</button>
           </div>
         </div>
         {data.gardenObjects.length > 0 && (
@@ -677,6 +843,77 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
         <div className="profile-row"><span className="profile-label">🔔 Советы</span><span className="profile-val">{data.notifMorning} / {data.notifEvening}</span></div>
       </div>
 
+      <div className="section-title" style={{ padding: '0 16px', marginTop: 16 }}>Удобство чтения</div>
+      <div style={{ padding: '0 16px' }}>
+        <button
+          className={`ob-toggle-row ${data.uiTextScale === 'large' ? 'active' : ''}`}
+          onClick={() => onUpdateData({ uiTextScale: data.uiTextScale === 'large' ? 'normal' : 'large' })}
+          aria-label={data.uiTextScale === 'large' ? 'Выключить крупный текст' : 'Включить крупный текст'}
+        >
+          <div>
+            <div className="profile-label" style={{ color: '#fff', fontWeight: 800 }}>🔎 Крупнее текст</div>
+            <div className="section-helper" style={{ padding: 0, marginTop: 4 }}>
+              Увеличивает подписи, поля и основные кнопки без общего zoom, чтобы интерфейс оставался ровным.
+            </div>
+          </div>
+          <div className={`ob-toggle ${data.uiTextScale === 'large' ? 'on' : ''}`} />
+        </button>
+      </div>
+      <div className="section-title" style={{ padding: '0 16px', marginTop: 16 }}>Подсказки</div>
+      <div style={{ padding: '0 16px' }}>
+        <button
+          className={`ob-toggle-row ${helpHintsEnabled ? 'active' : ''}`}
+          onClick={onToggleHelpHints}
+          aria-label={helpHintsEnabled ? 'Выключить подсказки' : 'Включить подсказки'}
+        >
+          <div>
+            <div className="profile-label" style={{ color: '#fff', fontWeight: 800 }}>💡 Показывать подсказки по делу</div>
+            <div className="section-helper" style={{ padding: 0, marginTop: 4 }}>
+              Короткие пояснения на главной, в растениях, в луне, в дневнике и профиле. Не сыпятся подряд и не мешают работать.
+            </div>
+          </div>
+          <div className={`ob-toggle ${helpHintsEnabled ? 'on' : ''}`} />
+        </button>
+        <button className="btn-help" style={{ margin: '0 0 10px', width: '100%' }} onClick={onReplayIntro}>
+          Показать вступительное ознакомление ещё раз
+        </button>
+      </div>
+      <div className="section-title" style={{ padding: '0 16px', marginTop: 16 }}>Инструменты и материалы</div>
+      <div style={{ padding: '0 16px' }}>
+        <div className="section-helper" style={{ padding: 0, marginBottom: 10 }}>
+          Отметьте, что у вас реально есть. Тогда AI будет советовать с опорой на эти вещи, а не ссылаться на абстрактные приборы.
+        </div>
+        <div className="section-helper" style={{ padding: 0, marginBottom: 10 }}>
+          Лейку и шланг отдельно не спрашиваем: считаем их базовыми вещами по умолчанию.
+        </div>
+        <div className="ob-chips ob-chips-wrap">
+          {TOOL_OPTIONS.map(toolName => (
+            <button
+              key={toolName}
+              className={`ob-chip ${data.tools.includes(toolName) ? 'selected' : ''}`}
+              onClick={() => handleToolToggle(toolName)}
+            >
+              {toolName}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="section-title" style={{ padding: '0 16px', marginTop: 16 }}>Особенности участка</div>
+      <div style={{ padding: '0 16px' }}>
+        <div className="section-helper" style={{ padding: 0, marginBottom: 10 }}>
+          Сюда можно записать постоянные особенности: почва быстро сохнет, северная сторона, сильный ветер, жёсткая вода, низина, слизни каждый год.
+        </div>
+        <textarea
+          className="profile-edit-input"
+          style={{ minHeight: 92, resize: 'vertical', width: '100%' }}
+          placeholder="Например: почва быстро пересыхает, после обеда сильное солнце, вода жёсткая, участок ветреный"
+          value={data.siteNotes ?? ''}
+          onChange={e => onUpdateData({ siteNotes: e.target.value.slice(0, 500) })}
+        />
+        <div className="profile-edit-hint" style={{ marginTop: 6 }}>
+          {`${(data.siteNotes ?? '').length}/500`}
+        </div>
+      </div>
       <div className="section-title" style={{ padding: '0 16px', marginTop: 16 }}>Получать уведомления в</div>
       <div className="notif-channels-grid">
         {NOTIF_CHANNELS.map(ch => {
@@ -692,6 +929,57 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
         })}
       </div>
       <div style={{ padding: '8px 16px 0' }}>
+        <div className="section-helper" style={{ padding: 0, marginBottom: 10 }}>
+          Если не хотите усложнять, оставьте только VK и утреннее время. Остальное можно настроить позже.
+        </div>
+        <div className="section-helper" style={{ padding: 0, marginBottom: 10 }}>
+          {telegramLinked
+            ? `Telegram подключён${data.telegramUsername ? `: @${data.telegramUsername}` : ''}. Можно получать советы прямо в бот.`
+            : 'Чтобы получать советы в Telegram, сначала войдите через Telegram на экране входа.'}
+        </div>
+        {telegramLinked && !tgTestOk && (
+          <button
+            className="btn-export"
+            style={{ marginBottom: 10 }}
+            disabled={tgTestSending}
+            onClick={() => {
+              setTgTestSending(true)
+              void sendTestTelegramNotification(vkUserId)
+                .then(() => {
+                  try {
+                    localStorage.setItem(`${TELEGRAM_TEST_OK_PREFIX}${vkUserId}`, '1')
+                  } catch {
+                    // Ignore localStorage write failures in private/incognito contexts.
+                  }
+                  setTgTestOk(true)
+                  window.alert('Тестовое сообщение отправлено в Telegram.')
+                })
+                .catch(error => window.alert(error instanceof Error ? error.message : 'Не удалось отправить тест в Telegram.'))
+                .finally(() => setTgTestSending(false))
+            }}
+          >
+            {tgTestSending ? 'Отправляю тест...' : 'Отправить тест в Telegram'}
+          </button>
+        )}
+        {telegramLinked && tgTestOk && (
+          <div className="section-helper" style={{ padding: 0, marginBottom: 10 }}>
+            Telegram уже проверен. Если когда-нибудь покажется, что советы не приходят, можно{' '}
+            <button
+              type="button"
+              className="btn-link-inline"
+              disabled={tgTestSending}
+              onClick={() => {
+                setTgTestSending(true)
+                void sendTestTelegramNotification(vkUserId)
+                  .then(() => window.alert('Тестовое сообщение снова отправлено в Telegram.'))
+                  .catch(error => window.alert(error instanceof Error ? error.message : 'Не удалось отправить тест в Telegram.'))
+                  .finally(() => setTgTestSending(false))
+              }}
+            >
+              отправить ещё раз
+            </button>.
+          </div>
+        )}
         <div className="ob-time-row" style={{ marginBottom: 12 }}>
           <div className="ob-time-field"><label>☀️ Утром</label><input type="time" value={notifMorningDraft} onChange={e => setNotifMorningDraft(e.target.value)} /></div>
           <div className="ob-time-field"><label>🌙 Вечером</label><input type="time" value={notifEveningDraft} onChange={e => setNotifEveningDraft(e.target.value)} /></div>
@@ -726,17 +1014,11 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
 
       <div className="section-title" style={{ padding: '0 16px', marginTop: 16 }}>Поделиться в VK</div>
       <div className="vk-share-grid">
-        <button className="vk-share-card" disabled={vkSharing !== null} onClick={() => void handleVkShare('garden')}>
+        <button className="vk-share-card premium" disabled={vkSharing !== null} onClick={() => void handleVkShare()}>
           <div className="vk-share-badge">VK POST</div>
-          <div className="vk-share-title">Обычный пост огорода</div>
-          <div className="vk-share-sub">Соберу красивую карточку грядок, сортов и города, затем открою пост в VK.</div>
-          <div className="vk-share-action">{vkSharing === 'garden' ? 'Готовлю карточку...' : 'Сделать пост'}</div>
-        </button>
-        <button className="vk-share-card premium" disabled={vkSharing !== null} onClick={() => void handleVkShare('premium')}>
-          <div className="vk-share-badge">PREMIUM</div>
-          <div className="vk-share-title">Премиум-пост</div>
-          <div className="vk-share-sub">Более яркая карточка с акцентом на подписку, AI-советы, свои сорта и дневник.</div>
-          <div className="vk-share-action">{vkSharing === 'premium' ? 'Готовлю премиум...' : 'Сделать премиум-пост'}</div>
+          <div className="vk-share-title">Красивый репост огорода</div>
+          <div className="vk-share-sub">Соберу одну информативную карточку с вашим огородом и пользой приложения, открою пост в VK и начислю +1 день Базовой, если бонус сегодня ещё не забирали.</div>
+          <div className="vk-share-action">{vkSharing === 'vk_post' ? 'Готовлю карточку и пост...' : 'Сделать репост и получить +1 день'}</div>
         </button>
       </div>
 
@@ -746,12 +1028,15 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
           <div className="subscription-status-top">
             <div>
               <div className="subscription-status-label">Реферальная программа</div>
-              <div className="subscription-status-title">7 дней Базовой за 2 друзей</div>
+              <div className="subscription-status-title">7 дней Базовой за 3 друзей</div>
             </div>
-            <span className="sub-active-badge">{data.referralInvitesAccepted ?? 0}/2</span>
+            <span className="sub-active-badge">{data.referralInvitesAccepted ?? 0}/3</span>
           </div>
           <div className="subscription-status-meta">
-            За каждых 2 друзей, которые пришли по твоей ссылке, ты получаешь 7 дней Базовой. За пост в VK — +1 день Базовой, но не чаще одного раза в день.
+            За каждых 3 друзей, которые пришли по твоей ссылке, ты получаешь 7 дней Базовой. За пост в VK — +1 день Базовой, но не чаще одного раза в день.
+          </div>
+          <div className="subscription-status-meta" style={{ marginTop: 6 }}>
+            Друг, который придёт по твоей ссылке, получит 2 дня Базовой бесплатно.
           </div>
           <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
             <div className="profile-row">
@@ -761,15 +1046,23 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
             <button className="btn-upgrade-full" onClick={() => void copyReferralLink()}>
               Скопировать ссылку приглашения
             </button>
-            <input
-              className="profile-edit-input"
-              placeholder="Ввести код друга"
-              value={referralInput}
-              onChange={e => setReferralInput(e.target.value.toUpperCase())}
-            />
-            <button className="btn-export" onClick={applyReferralCode}>
-              Применить код друга
-            </button>
+            {data.referralAppliedCode ? (
+              <div className="subscription-status-meta" style={{ textAlign: 'center' }}>
+                ✅ Код друга применён — 2 дня Базовой уже начислены
+              </div>
+            ) : (
+              <>
+                <input
+                  className="profile-edit-input"
+                  placeholder="Ввести код друга"
+                  value={referralInput}
+                  onChange={e => setReferralInput(e.target.value.toUpperCase())}
+                />
+                <button className="btn-export" onClick={applyReferralCode}>
+                  Применить код друга
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -800,6 +1093,11 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
             {plan !== 'free' && <span className="sub-active-badge">Активен</span>}
           </div>
           <div className="subscription-status-meta">{currentMeta}</div>
+          {legacyPaidAccess && (
+            <div className="subscription-status-meta" style={{ marginTop: 6 }}>
+              Детали последней оплаты в этой карточке не сохранились, но сам тариф {plan === 'base' ? 'Базовая' : 'Про'} у вас активен и больше не должен теряться при обычном сохранении профиля.
+            </div>
+          )}
         </div>
       </div>
 
@@ -818,29 +1116,58 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
               {adminLoading && <div className="subscription-status-meta">Загружаю статистику...</div>}
               {adminError && <div className="subscription-status-meta" style={{ color: '#fca5a5' }}>{adminError}</div>}
               {adminStats && (
-                <div className="admin-stats-grid">
-                  <div className="admin-stat-card"><div className="admin-stat-label">Всего пользователей</div><div className="admin-stat-value">{adminStats.totalUsers}</div></div>
-                  <div className="admin-stat-card"><div className="admin-stat-label">Новых за 7 дней</div><div className="admin-stat-value">{adminStats.newUsers7d}</div></div>
-                  <div className="admin-stat-card"><div className="admin-stat-label">Платных активных</div><div className="admin-stat-value">{adminStats.activePaidUsers}</div></div>
-                  <div className="admin-stat-card"><div className="admin-stat-label">Записей в дневнике</div><div className="admin-stat-value">{adminStats.diaryEntries}</div></div>
-                  <div className="admin-stat-card"><div className="admin-stat-label">Успешных оплат</div><div className="admin-stat-value">{adminStats.successfulPayments}</div></div>
-                  <div className="admin-stat-card"><div className="admin-stat-label">Выручка всего</div><div className="admin-stat-value">{formatPrice(adminStats.revenueTotal)}</div></div>
-                  <div className="admin-stat-card"><div className="admin-stat-label">Выручка 30 дней</div><div className="admin-stat-value">{formatPrice(adminStats.revenue30d)}</div></div>
-                  <div className="admin-stat-card"><div className="admin-stat-label">Входов 7 дней</div><div className="admin-stat-value">{adminStats.authSuccesses7d}</div></div>
-                  <div className="admin-stat-card"><div className="admin-stat-label">Онбординг 7 дней</div><div className="admin-stat-value">{adminStats.onboardingCompleted7d}</div></div>
-                  <div className="admin-stat-card"><div className="admin-stat-label">Открыли оплату</div><div className="admin-stat-value">{adminStats.checkoutOpened7d}</div></div>
-                  <div className="admin-stat-card"><div className="admin-stat-label">Оплатили 30 дней</div><div className="admin-stat-value">{adminStats.paymentSucceeded30d}</div></div>
-                  <div className="admin-stat-card"><div className="admin-stat-label">Рефералы 7 дней</div><div className="admin-stat-value">{adminStats.referralApplied7d}</div></div>
-                  <div className="admin-stat-card"><div className="admin-stat-label">VK-посты 7 дней</div><div className="admin-stat-value">{adminStats.vkShares7d}</div></div>
-                </div>
+                <>
+                  <div className="admin-stats-grid">
+                    <div className="admin-stat-card"><div className="admin-stat-label">Всего пользователей</div><div className="admin-stat-value">{adminStats.totalUsers}</div></div>
+                    <div className="admin-stat-card"><div className="admin-stat-label">Новых за 7 дней</div><div className="admin-stat-value">{adminStats.newUsers7d}</div></div>
+                    <div className="admin-stat-card"><div className="admin-stat-label">Платных активных</div><div className="admin-stat-value">{adminStats.activePaidUsers}</div></div>
+                    <div className="admin-stat-card"><div className="admin-stat-label">Выручка 30 дней</div><div className="admin-stat-value">{formatPrice(adminStats.revenue30d)}</div></div>
+                  </div>
+                  <div className="sub-alert-body" style={{ marginTop: 12, wordBreak: 'break-all' }}>{ownerAnalyticsUrl}</div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                    <button className="btn-export" onClick={onOpenOwnerAnalytics}>Открыть полный дашборд</button>
+                    <button className="btn-export" onClick={() => void navigator.clipboard.writeText(ownerAnalyticsUrl)}>Скопировать ссылку</button>
+                  </div>
+                </>
               )}
             </div>
           </div>
         </>
       )}
 
+      {weeklyPlanOffer && (
+        <>
+          <div className="section-title" style={{ padding: '0 16px', marginTop: 12 }}>Отдельно от подписки</div>
+          <div className="sub-cards">
+            <div className={`sub-card ${weeklyPlannerAccess ? 'active' : ''}`}>
+              <div className="sub-card-header">
+                <span style={{ fontSize: 22 }}>{weeklyPlanOffer.icon}</span>
+                <div>
+                  <div className="sub-card-name">{weeklyPlanOffer.title}</div>
+                  <div className="sub-card-price">{weeklyPlanOffer.priceLabel}</div>
+                </div>
+                {(plan === 'pro' || weeklyPlannerAccess) && (
+                  <span className="sub-active-badge">{plan === 'pro' ? 'В Про' : 'Активен'}</span>
+                )}
+              </div>
+              <div className="subscription-offer-sub">{weeklyPlanOffer.subtitle} · {weeklyPlanOffer.days} дн.</div>
+              <div className="subscription-offer-savings" style={{ color: 'rgba(255,255,255,.65)', fontWeight: 600 }}>
+                {weeklyPlannerMeta}
+              </div>
+              <ul className="plan-features">{weeklyPlanOffer.features.map(feature => <li key={`${weeklyPlanOffer.id}-${feature}`}>{feature}</li>)}</ul>
+              {!weeklyPlannerAccess && (
+                <button className="btn-upgrade-full" disabled={checkoutLoading} onClick={() => void openCheckout(weeklyPlanOffer.id)}>
+                  {checkoutLoading && checkoutOfferId === weeklyPlanOffer.id ? 'Открываю оплату...' : `Купить за ${formatPrice(weeklyPlanOffer.amount)}`}
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      <div className="section-title" style={{ padding: '0 16px', marginTop: 12 }}>Подписки</div>
       <div className="sub-cards">
-        {offers.map(offer => {
+        {subscriptionOffers.map(offer => {
           const isCurrent = currentSubscription
             ? currentSubscription.level === offer.level && currentSubscription.period === offer.period && plan === offer.level
             : plan === offer.level && offer.period === 'monthly'
@@ -875,6 +1202,30 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
         )}
       </div>
 
+      <div className="section-title" style={{ padding: '0 16px', marginTop: 16 }}>📱 Офлайн-копия</div>
+      <div style={{ padding: '0 16px' }}>
+        <div className="subscription-status-card">
+          <div className="subscription-status-top">
+            <div>
+              <div className="subscription-status-label">Без сети</div>
+              <div className="subscription-status-title">Сохранить данные на устройстве</div>
+            </div>
+            <span className="sub-active-badge">{offlineMode ? 'Офлайн' : 'Готово'}</span>
+          </div>
+          <div className="subscription-status-meta">
+            Можно заранее обновить офлайн-копию, чтобы без сети открывались сохранённые данные огорода, недавний дневник, последний совет, погода и план недели. Чат, оплата и новые данные без интернета не обновляются.
+          </div>
+          <div className="sub-alert-body" style={{ marginTop: 10 }}>
+            {offlineBundleSavedAt
+              ? `Последнее обновление: ${new Date(offlineBundleSavedAt).toLocaleString('ru-RU')}.`
+              : 'Офлайн-копия ещё не подготовлена.'}
+          </div>
+          <button className="btn-upgrade-full" style={{ marginTop: 12 }} disabled={offlinePreparing} onClick={onPrepareOffline}>
+            {offlinePreparing ? 'Обновляю офлайн-копию...' : 'Обновить офлайн-копию'}
+          </button>
+        </div>
+      </div>
+
       {/* Экспорт */}
       <div className="section-title" style={{ padding: '0 16px', marginTop: 16 }}>📤 Экспорт данных</div>
       <div style={{ padding: '0 16px 8px', display: 'flex', gap: 8 }}>
@@ -883,7 +1234,7 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
           const [diary, seasons, notifs] = await Promise.all([
             loadDiary(vkUserId),
             loadSeasons(vkUserId),
-            supabase.from('notifications').select('*').eq('vk_user_id', vkUserId).order('created_at', { ascending: false }).limit(100).then(r => r.data || []),
+            loadNotifications(vkUserId, { limit: 100 }),
           ])
           await exportCSV(data, diary as DiaryEntry[], seasons as Season[], notifs as NotificationRow[])
           setExporting(false)
@@ -893,7 +1244,7 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
           const [diary, seasons, notifs] = await Promise.all([
             loadDiary(vkUserId),
             loadSeasons(vkUserId),
-            supabase.from('notifications').select('*').eq('vk_user_id', vkUserId).order('created_at', { ascending: false }).limit(100).then(r => r.data || []),
+            loadNotifications(vkUserId, { limit: 100 }),
           ])
           exportHTML(data, diary as DiaryEntry[], seasons as Season[], notifs as NotificationRow[])
           setExporting(false)
@@ -926,7 +1277,7 @@ export function ProfileScreen({ data, plan, onChangePlan, onUpdateData, vkUserId
       </div>
 
       {/* Удаление аккаунта */}
-      <DeleteAccountButton vkUserId={vkUserId} />
+      <DeleteAccountButton vkUserId={vkUserId} onDeleted={onVkLogout} />
     </div>
   )
 }

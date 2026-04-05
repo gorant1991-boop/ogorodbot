@@ -153,6 +153,7 @@ export const CROP_OPERATIONS: Record<string, { id: string; label: string }[]> = 
 // ============= Уведомления =============
 export const NOTIF_CHANNELS = [
   { id: 'email', icon: '✉️', label: 'Email' },
+  { id: 'tg', icon: '✈️', label: 'Telegram' },
   { id: 'vk', icon: '💙', label: 'ВКонтакте' },
 ]
 
@@ -161,6 +162,9 @@ export const GROW_OPTIONS = [
   { id: 'open', icon: '🌱', title: 'Открытый грунт', sub: 'Грядки, огород' },
   { id: 'greenhouse', icon: '🏠', title: 'Теплица', sub: 'Стационарная или плёночная' },
   { id: 'hotbed', icon: '🫧', title: 'Парник', sub: 'Дуги, мини-парник' },
+  { id: 'berry', icon: '🍓', title: 'Ягодник', sub: 'Клубника, малина, смородина' },
+  { id: 'flowerbed', icon: '🌸', title: 'Клумба', sub: 'Цветы и декоративные растения' },
+  { id: 'pots', icon: '🪴', title: 'Горшки / балкон', sub: 'Контейнеры, подоконник, терраса' },
 ]
 
 // ============= Типы почвы =============

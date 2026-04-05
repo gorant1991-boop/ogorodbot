@@ -1,21 +1,25 @@
 import { useState } from 'react'
-import type { OnboardingData, CropEntry, CropVariety, FertilizerItem, Plan } from '../../utils/types'
-import { CROPS, CROP_CATEGORIES, CROP_DAYS, PLAN_LIMITS, GROW_OPTIONS, SOIL_LABELS, buildDiaryText, getFirstOp, getOps, getWeatherRisks, daysSince, getCropStage, isPerennial } from '../../utils/constants'
+import type { DiaryEntry, OnboardingData, CropEntry, CropVariety, FertilizerItem, Plan } from '../../utils/types'
+import { CROPS, CROP_CATEGORIES, CROP_DAYS, PLAN_LIMITS, GROW_OPTIONS, OBJECT_LIMITS, SOIL_LABELS, buildDiaryText, buildObjectName, getCropNameCase, getDiaryEntryKindOptions, getFirstOp, getOperationDetailOptions, getOps, getPrimaryOp, getWeatherRisks, daysSince, getCropStage, isPerennial, makeObject } from '../../utils/constants'
 import { useWeather } from '../../hooks'
 import { CropEditModal, CropVarietyPickerModal } from '../../components/modals'
 import { CompatScreen } from './CompatScreen'
 import { DiseaseScreen } from './DiseaseScreen'
 import { addDiaryEntry } from '../../supabase'
 
-export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEntry, vkUserId, onAskAi, onUpdateData }: {
+export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEntry, vkUserId, onAskAi, onUpdateData, completedTodayTaskKeys = [], completingTodayTaskKey = '', onCompleteTodayTask, onDiaryEntryAdded }: {
   data: OnboardingData
   plan: Plan
   onUpdateEntry: (id: string, patch: Partial<CropEntry>) => void
   onAddEntry: (entry: CropEntry) => void
   onDeleteEntry: (id: string) => void
   vkUserId: number
-  onAskAi: (question: string) => void
+  onAskAi: (question: string, displayQuestion: string) => void
   onUpdateData: (patch: Partial<OnboardingData>) => void
+  completedTodayTaskKeys?: string[]
+  completingTodayTaskKey?: string
+  onCompleteTodayTask?: (entry: CropEntry) => void
+  onDiaryEntryAdded?: (entry: DiaryEntry) => void
 }) {
   const [editEntry, setEditEntry] = useState<CropEntry | null>(null)
   const [showDiaryAdd, setShowDiaryAdd] = useState(false)
@@ -23,6 +27,8 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
   const [diaryVariety, setDiaryVariety] = useState<string>('')
   const [diaryText, setDiaryText] = useState('')
   const [diaryOp, setDiaryOp] = useState('')
+  const [diaryKind, setDiaryKind] = useState<'done' | 'observation' | 'plan'>('observation')
+  const [diaryOpDetail, setDiaryOpDetail] = useState('')
   const [diarySaving, setDiarySaving] = useState(false)
   const [showAddCrop, setShowAddCrop] = useState(false)
   const [pickerCropId, setPickerCropId] = useState<string | null>(null)
@@ -49,6 +55,20 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
       .map(v => `${v.name.trim()}: ${v.note?.trim()}`)
   }
 
+  function getProgressStartDate(entry: CropEntry) {
+    return entry.emergenceDate?.trim() || entry.sowDate
+  }
+
+  function getTotalMaturityDays(entry: CropEntry) {
+    return entry.maturityDays ?? entry.varieties[0]?.days ?? CROP_DAYS[entry.id] ?? 90
+  }
+
+  function getTimingSourceLabel(entry: CropEntry) {
+    if (entry.emergenceDate) return 'от всходов'
+    if (entry.sowMethod === 'seedling') return 'от посева'
+    return 'от посева'
+  }
+
   const existingIds = data.cropEntries.map(e => e.id)
   const cropLimit = PLAN_LIMITS[plan]
   const cropLimitReached = data.cropEntries.length >= cropLimit
@@ -58,16 +78,35 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
     const crop = CROPS.find(c => c.id === entry.id)
     const location = data.gardenObjects.find(obj => obj.uid === entry.location)
     const cleanVariety = varietyName?.trim()
+    const selectedVariety = cleanVariety
+      ? entry.varieties.find(variety => variety.name.trim() === cleanVariety)
+      : null
     const allVarieties = entry.varieties.filter(v => v.name.trim()).map(v => v.name.trim())
     const varietyLabel = cleanVariety
-      ? `Сорт: ${cleanVariety}.`
+      ? `Сорт: ${cleanVariety}.${selectedVariety?.note?.trim() ? ` Пометка по сорту: ${selectedVariety.note.trim()}.` : ''}${selectedVariety?.days ? ` Срок сорта: около ${selectedVariety.days} дней.` : ''}`
       : allVarieties.length > 0
         ? `Сорта: ${allVarieties.join(', ')}.`
         : 'Сорт пока не указан.'
+    const shortVarietyLabel = cleanVariety
+      ? `сорт ${cleanVariety}`
+      : allVarieties.length > 0
+        ? `сорта ${allVarieties.slice(0, 2).join(', ')}${allVarieties.length > 2 ? ' и др.' : ''}`
+        : ''
     const statusLabel = entry.status === 'planted' ? 'уже посажена' : 'пока планируется'
     const dateLabel = entry.sowDate ? `Дата посева или высадки: ${entry.sowDate}.` : 'Дата посева или высадки пока не указана.'
+    const cropDative = getCropNameCase(entry.id, 'dative')
+    const displayQuestion = [
+      `Совет по культуре: ${crop?.name ?? entry.id}`,
+      shortVarietyLabel,
+      location?.name ? `место ${location.name}` : '',
+      entry.status === 'planted' ? 'статус: посажена' : 'статус: в планах',
+      entry.sowDate ? `дата: ${entry.sowDate}` : '',
+    ].filter(Boolean).join(' · ')
 
-    return `Дай конкретный практический совет по культуре ${crop?.name ?? entry.id}. ${varietyLabel} Статус: ${statusLabel}. ${dateLabel} Место выращивания: ${location?.name ?? 'не указано'}. Подскажи, что сделать сейчас и на что обратить внимание в ближайшие дни.`
+    return {
+      displayQuestion,
+      aiQuestion: `Дай конкретный практический совет по ${cropDative}. ${varietyLabel} Статус: ${statusLabel}. ${dateLabel} Место выращивания: ${location?.name ?? 'не указано'}. Пиши только по-русски, без английских слов и технических id. Лучше отвечай коротко и по схеме: что сделать сейчас, что проверить дальше, за чем следить в ближайшие дни.`,
+    }
   }
 
   function closeDiaryAdd() {
@@ -75,6 +114,8 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
     setDiaryOp('')
     setDiaryCropId('')
     setDiaryVariety('')
+    setDiaryKind('observation')
+    setDiaryOpDetail('')
     setShowDiaryAdd(false)
     setDiarySaving(false)
   }
@@ -82,8 +123,23 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
   async function handleDiarySave() {
     if (!diaryText.trim()) return
     setDiarySaving(true)
-    await addDiaryEntry(vkUserId, diaryCropId || null, diaryOp || null, buildDiaryText(diaryText, diaryVariety))
-    closeDiaryAdd()
+    try {
+      const savedEntry = await addDiaryEntry(
+        vkUserId,
+        diaryCropId || null,
+        diaryOp || null,
+        buildDiaryText(diaryText, {
+          varietyName: diaryVariety,
+          entryKind: diaryKind,
+          operationDetail: diaryOpDetail || null,
+        })
+      )
+      onDiaryEntryAdded?.(savedEntry)
+      closeDiaryAdd()
+    } catch (error) {
+      setDiarySaving(false)
+      window.alert(error instanceof Error ? error.message : 'Не удалось сохранить запись. Попробуйте ещё раз.')
+    }
   }
 
   function updateFertilizers(next: FertilizerItem[]) {
@@ -125,6 +181,9 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
     if (editingFertilizerId === id) resetFertilizerDraft()
   }
 
+  const diaryKindOptions = getDiaryEntryKindOptions()
+  const diaryDetailOptions = diaryOp ? getOperationDetailOptions(diaryOp) : []
+
   return (
     <div className="tab-content">
       {showDiaryAdd && (
@@ -146,9 +205,42 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
                   {getOps(diaryCropId).map(op => (
                     <button key={op.id} className={`ob-chip ${diaryOp === op.id ? 'selected' : ''}`}
-                      onClick={() => setDiaryOp(diaryOp === op.id ? '' : op.id)}>{op.label}</button>
+                      onClick={() => {
+                        const nextValue = diaryOp === op.id ? '' : op.id
+                        setDiaryOp(nextValue)
+                        setDiaryOpDetail('')
+                        if (nextValue && diaryKind === 'observation') setDiaryKind('done')
+                      }}>{op.label}</button>
                   ))}
                 </div>
+                <div className="modal-section-label">Это что за запись</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                  {diaryKindOptions.map(option => (
+                    <button
+                      key={option.value}
+                      className={`ob-chip ${diaryKind === option.value ? 'selected' : ''}`}
+                      onClick={() => setDiaryKind(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {diaryDetailOptions.length > 0 && (
+                  <>
+                    <div className="modal-section-label">Уточнение операции</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                      {diaryDetailOptions.map(option => (
+                        <button
+                          key={option.value}
+                          className={`ob-chip ${diaryOpDetail === option.value ? 'selected' : ''}`}
+                          onClick={() => setDiaryOpDetail(diaryOpDetail === option.value ? '' : option.value)}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
                 {diaryCrop?.varieties.some(v => v.name.trim()) && (
                   <>
                     <div className="modal-section-label">Сорт</div>
@@ -193,14 +285,17 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
             setDiaryVariety(varietyName ?? '')
             setDiaryText('')
             setDiaryOp('')
+            setDiaryKind('observation')
+            setDiaryOpDetail('')
             setEditEntry(null)
             setShowDiaryAdd(true)
           }}
           onAskAi={(cropId: string, varietyName?: string) => {
             const entry = data.cropEntries.find(item => item.id === cropId)
             if (!entry) return
+            const adviceQuestion = buildAdviceQuestion(entry, varietyName)
             setEditEntry(null)
-            onAskAi(buildAdviceQuestion(entry, varietyName))
+            onAskAi(adviceQuestion.aiQuestion, adviceQuestion.displayQuestion)
           }}
         />
       )}
@@ -279,8 +374,24 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
         <button className={`ob-chip ${plantsTab === 'disease' ? 'selected' : ''}`} style={{ whiteSpace: 'normal', lineHeight: 1.15, minHeight: 40, width: '100%', textAlign: 'center', justifyContent: 'center' }} onClick={() => setPlantsTab('disease')}>⚠️ Болезни</button>
       </div>
 
+      {plantsTab !== 'disease' && data.cropEntries.some(entry => entry.status === 'planted') && (
+        <div style={{ padding: '8px 16px 6px' }}>
+          <div style={{ background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.22)', borderRadius: 14, padding: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#dcfce7', marginBottom: 4 }}>
+              Новая бесплатная диагностика по симптомам
+            </div>
+            <div style={{ fontSize: 12, lineHeight: 1.5, color: '#bbf7d0', marginBottom: 10 }}>
+              Во вкладке `Болезни` можно быстро сузить причину по кнопкам: пятна, налёт, вялость, вредители, стресс по влаге и другие сценарии для всех ваших культур.
+            </div>
+            <button className="btn-export" onClick={() => setPlantsTab('disease')}>
+              Открыть диагностику
+            </button>
+          </div>
+        </div>
+      )}
+
       {plantsTab === 'compat' && <CompatScreen cropEntries={data.cropEntries} />}
-      {plantsTab === 'disease' && <DiseaseScreen cropEntries={data.cropEntries} city={data.city} />}
+      {plantsTab === 'disease' && <DiseaseScreen data={data} vkUserId={vkUserId} />}
       {plantsTab === 'fertilizers' && (
         <div style={{ padding: '12px 16px 24px' }}>
           <div className="section-title">Мои удобрения</div>
@@ -356,7 +467,7 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
         {weather.loading ? (
           <div className="weather-loading">Загружаем погоду...</div>
         ) : weather.error ? (
-          <div className="weather-loading">Погода недоступна</div>
+          <div className="weather-loading">{weather.error}</div>
         ) : (
           <div className="weather-row">
             <div className="weather-main">
@@ -384,21 +495,37 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
       {data.cropEntries.filter(e => e.status === 'planted').length > 0 && (
         <>
           <div className="section-title" style={{ padding: '0 16px', marginTop: 16 }}>📅 Сегодня сделать</div>
+          <div className="section-helper" style={{ padding: '0 16px' }}>
+            Нажмите на карточку культуры, чтобы открыть её подробнее, или на кнопку справа, чтобы сразу отметить дело в дневнике.
+          </div>
           <div className="ops-list">
             {data.cropEntries.filter(e => e.status === 'planted').slice(0, 5).map(entry => {
               const crop = CROPS.find(c => c.id === entry.id)
+              const primaryOp = getPrimaryOp(entry.id)
+              const taskKey = `${entry.id}:${primaryOp.id}`
+              const taskDone = completedTodayTaskKeys.includes(taskKey)
               if (!crop) return null
               return (
-                <div key={entry.id} className="op-row" onClick={() => setEditEntry(entry)}>
+                <div key={entry.id} className={`op-row ${taskDone ? 'is-complete' : ''}`} onClick={() => setEditEntry(entry)}>
                   <span className="op-icon">{crop.icon}</span>
                   <div className="op-info">
                     <div className="op-name">
                       {crop.name}
                       {entry.varieties.filter(v => v.name.trim()).length > 0 ? ` · ${getVarietySummary(entry)}` : ''}
                     </div>
-                    <div className="op-action">{getFirstOp(entry.id)}</div>
+                    <div className="op-action">{taskDone ? 'Отмечено в дневнике сегодня' : getFirstOp(entry.id)}</div>
                   </div>
-                  <button className="btn-done-sm">✓</button>
+                  <button
+                    className={`btn-done-sm ${taskDone ? 'done' : ''}`}
+                    disabled={taskDone || completingTodayTaskKey === taskKey}
+                    aria-label={taskDone ? `Задача для ${crop.name} уже отмечена` : `Отметить дело для ${crop.name}`}
+                    onClick={e => {
+                      e.stopPropagation()
+                      onCompleteTodayTask?.(entry)
+                    }}
+                  >
+                    {taskDone ? 'Готово' : completingTodayTaskKey === taskKey ? '...' : 'Отметить'}
+                  </button>
                 </div>
               )
             })}
@@ -425,14 +552,19 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
               {objCrops.map(entry => {
                 const crop = CROPS.find(c => c.id === entry.id)
                 if (!crop) return null
-                const days = daysSince(entry.sowDate)
-                const totalDays = (entry.varieties[0]?.days) ?? CROP_DAYS[entry.id] ?? 90
+                const days = daysSince(getProgressStartDate(entry))
+                const totalDays = getTotalMaturityDays(entry)
                 const perennial = isPerennial(entry.id)
-                const stage = perennial ? '🌿 Многолетник' : entry.status === 'planted' ? getCropStage(days, totalDays) : '📋 Планируется'
+                const stage = perennial
+                  ? '🌿 Многолетник'
+                  : entry.status === 'planted'
+                    ? getCropStage(days, totalDays, { afterEmergence: Boolean(entry.emergenceDate) })
+                    : '📋 Планируется'
                 const pct = !perennial && days >= 0 && entry.status === 'planted' ? Math.min(100, (days / totalDays) * 100) : 0
                 const daysLeft = !perennial && entry.status === 'planted' && days >= 0 ? Math.max(0, totalDays - days) : null
                 const namedVarieties = entry.varieties.filter(v => v.name.trim())
                 const varietyNotes = getVarietyNotes(entry)
+                const timingSourceLabel = getTimingSourceLabel(entry)
                 return (
                   <button key={entry.id} className="crop-dash-card" onClick={() => { setShowAddCrop(false); setPickerCropId(null); setEditEntry(entry) }}>
                     <div className="crop-dash-top">
@@ -452,11 +584,16 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
                     )}
                     <div className={`crop-dash-stage ${entry.status === 'planned' ? 'planned' : ''}`}>{stage}</div>
                     {daysLeft !== null && <div className="crop-dash-days">{daysLeft === 0 ? '🎉 Готов!' : `${daysLeft}д`}</div>}
+                    {entry.status === 'planted' && !perennial && (
+                      <div className="crop-dash-timing">
+                        {timingSourceLabel} · {totalDays}д
+                      </div>
+                    )}
                     {!perennial && <div className="crop-dash-bar"><div className="crop-dash-fill" style={{ width: `${pct}%` }} /></div>}
                     {namedVarieties.length > 1 && entry.status === 'planted' && entry.sowDate && !perennial && (
                       <div className="crop-variety-bars">
                         {namedVarieties.map((v, vi) => {
-                          const vDays = v.days ?? totalDays
+                          const vDays = v.days ?? entry.maturityDays ?? totalDays
                           const vPct = Math.min(100, (days / vDays) * 100)
                           const vLeft = Math.max(0, vDays - days)
                           return (
@@ -474,7 +611,7 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
               })}
               <button className="crop-dash-add" onClick={() => {
                 if (cropLimitReached) { setShowAddCrop(true) } else { setShowAddCrop(true) }
-              }}>
+              }} aria-label={cropLimitReached ? 'Лимит культур достигнут, посмотреть тарифы' : 'Добавить новую культуру'} title={cropLimitReached ? 'Лимит культур достигнут' : 'Добавить культуру'}>
                 <div style={{ fontSize: cropLimitReached ? 16 : 24 }}>{cropLimitReached ? '🔒' : '＋'}</div>
                 <div style={{ fontSize: 10, fontWeight: 700, marginTop: 2 }}>{cropLimitReached ? `${cropLimit} макс` : 'Добавить'}</div>
               </button>
@@ -483,8 +620,31 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
         )
       })}
 
-      {data.gardenObjects.length === 0 && data.cropEntries.length === 0 && (
-        <div className="empty-hint">Пройдите настройку огорода чтобы добавить культуры</div>
+      {data.gardenObjects.length === 0 && (
+        <div className="plants-no-objects">
+          <div className="plants-no-objects-icon">🏡</div>
+          <div className="plants-no-objects-title">Сначала добавьте место выращивания</div>
+          <div className="plants-no-objects-sub">Грядка, теплица, парник, ягодник — выберите что есть у вас, а потом разместите туда культуры.</div>
+          <div className="plants-no-objects-grid">
+            {GROW_OPTIONS.slice(0, 4).map(o => (
+              <button
+                key={o.id}
+                className="plants-no-objects-btn"
+                disabled={data.gardenObjects.length >= OBJECT_LIMITS[plan]}
+                onClick={() => {
+                  const count = data.gardenObjects.filter(x => x.type === o.id).length
+                  onUpdateData({ gardenObjects: [...data.gardenObjects, makeObject(o.id, buildObjectName(o.id, count + 1))] })
+                }}
+              >
+                <span>{o.icon}</span>
+                <span>{o.title}</span>
+              </button>
+            ))}
+          </div>
+          <div className="plants-no-objects-more">
+            Клумба, ягодник и горшки — в разделе «Профиль → Объекты»
+          </div>
+        </div>
       )}
       </div>}
     </div>

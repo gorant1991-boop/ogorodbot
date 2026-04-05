@@ -959,6 +959,17 @@ html {
 .fact-action-btn-practical { background: rgba(251,191,36,.12); border-color: rgba(251,191,36,.28); color: #fde68a; }
 .fact-action-btn-science { background: rgba(96,165,250,.12); border-color: rgba(96,165,250,.24); color: #bfdbfe; }
 .empty-hint { font-size: 14px; color: rgba(255,255,255,.42); text-align: center; padding: 20px 16px; font-weight: 600; line-height: 1.5; }
+
+.plants-no-objects { margin: 16px; padding: 20px 16px; background: rgba(74,222,128,.07); border: 1px solid rgba(74,222,128,.18); border-radius: 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.plants-no-objects-icon { font-size: 36px; }
+.plants-no-objects-title { font-size: 16px; font-weight: 800; color: #fff; text-align: center; }
+.plants-no-objects-sub { font-size: 13px; color: rgba(255,255,255,.55); text-align: center; line-height: 1.45; }
+.plants-no-objects-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; margin-top: 4px; }
+.plants-no-objects-btn { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 12px 8px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 14px; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Nunito', sans-serif; transition: background .15s; }
+.plants-no-objects-btn span:first-child { font-size: 24px; }
+.plants-no-objects-btn:hover { background: rgba(74,222,128,.12); }
+.plants-no-objects-btn:disabled { opacity: .4; cursor: not-allowed; }
+.plants-no-objects-more { font-size: 11px; color: rgba(255,255,255,.3); text-align: center; margin-top: 4px; }
 .section-title { font-size: 12px; font-weight: 700; color: rgba(255,255,255,.52); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 10px; }
 
 /* ── ПОДСКАЗКИ ──────────────────────────────────────────────────── */

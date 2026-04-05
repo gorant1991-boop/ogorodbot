@@ -1,8 +1,7 @@
-import type { BillingPeriod, OnboardingData, Plan, SubscriptionInfo } from '../types'
+import type { BillingPeriod, CheckoutOfferKind, OnboardingData, Plan, SubscriptionInfo } from '../types'
 
-export const OBJECT_LIMITS: Record<Plan, number> = { free: 1, base: 3, pro: 999 }
+export const OBJECT_LIMITS: Record<Plan, number> = { free: 3, base: 8, pro: 999 }
 export const MONTHLY_PRICES: Record<Plan, number> = { free: 0, base: 150, pro: 300 }
-export const SEASON_DISCOUNT_PERCENT = 20
 
 type PaidPlan = Exclude<Plan, 'free'>
 
@@ -15,10 +14,11 @@ interface PlanSummaryCard {
   features: string[]
 }
 
-export interface SubscriptionOffer {
+export interface CheckoutOffer {
   id: string
-  level: PaidPlan
-  period: BillingPeriod
+  kind: CheckoutOfferKind
+  level?: PaidPlan
+  period?: BillingPeriod
   icon: string
   title: string
   subtitle: string
@@ -32,10 +32,13 @@ export interface SubscriptionOffer {
   features: string[]
 }
 
+export const WEEKLY_PLAN_PRICE = 99
+export const WEEKLY_PLAN_ACCESS_DAYS = 7
+
 const PAID_PLAN_FEATURES: Record<PaidPlan, string[]> = {
   base: [
     'До 15 культур',
-    'До 3 объектов',
+    'До 8 объектов',
     'Все уведомления',
     'Прогноз на 7 дней',
     'Лунный календарь',
@@ -57,49 +60,30 @@ export const PLAN_SUMMARY_CARDS: PlanSummaryCard[] = [
     icon: '🌱', 
     name: 'Бесплатно', 
     price: '0 ₽',
-    features: ['До 10 культур', '1 объект', 'Критичные уведомления', '3 вопроса агроному/день'] 
+    features: ['До 10 культур', 'До 3 объектов', 'Критичные уведомления', '3 вопроса агроному/день']
   },
   { 
     id: 'base' as Plan, 
     icon: '🌿', 
     name: 'Базовая', 
-    price: 'от 150 ₽',
-    badge: 'Месяц и сезон',
-    features: ['До 15 культур', 'До 3 объектов', 'Все уведомления', 'Прогноз на 7 дней', 'Лунный календарь', 'Чат без лимита'] 
+    price: '150 ₽/мес',
+    features: ['До 15 культур', 'До 8 объектов', 'Все уведомления', 'Прогноз на 7 дней', 'Лунный календарь', 'Чат без лимита']
   },
   { 
     id: 'pro' as Plan, 
     icon: '🏆', 
     name: 'Про', 
-    price: 'от 300 ₽',
-    badge: 'Сезон -20%',
+    price: '300 ₽/мес',
     features: ['Без ограничений', 'Свои сорта', 'План работ на 7 дней', 'Совместимость культур', 'История сезонов', 'Экспорт дневника'] 
   },
 ]
 
 export const PLANS = PLAN_SUMMARY_CARDS
 
-function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-
-function getSeasonEndDate(now: Date): Date {
-  const year = now.getFullYear()
-  const seasonEnd = new Date(year, 9, 31, 23, 59, 59, 999)
-  if (now <= seasonEnd) return seasonEnd
-  return new Date(year + 1, 9, 31, 23, 59, 59, 999)
-}
-
 function addDays(date: Date, days: number): Date {
   const next = new Date(date)
   next.setDate(next.getDate() + days)
   return next
-}
-
-function diffDaysInclusive(from: Date, to: Date): number {
-  const start = startOfDay(from).getTime()
-  const end = startOfDay(to).getTime()
-  return Math.max(1, Math.ceil((end - start) / 86400000) + 1)
 }
 
 export function formatPrice(amount: number): string {
@@ -110,54 +94,61 @@ export function formatDateLabel(dateIso: string): string {
   return new Date(dateIso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
 }
 
-export function buildSubscriptionOffers(now = new Date()): SubscriptionOffer[] {
-  const seasonEnd = getSeasonEndDate(now)
-
-  return (['base', 'pro'] as PaidPlan[]).flatMap(level => {
+export function buildSubscriptionOffers(now = new Date()): CheckoutOffer[] {
+  const subscriptionOffers: CheckoutOffer[] = (['base', 'pro'] as PaidPlan[]).map(level => {
     const monthlyPrice = MONTHLY_PRICES[level]
     const monthlyEndsAt = addDays(now, 30)
-    const seasonDays = diffDaysInclusive(now, seasonEnd)
-    const seasonBaseAmount = Math.ceil((monthlyPrice / 30) * seasonDays)
-    const seasonAmount = Math.ceil(seasonBaseAmount * (1 - SEASON_DISCOUNT_PERCENT / 100))
 
-    return [
-      {
-        id: `${level}-monthly`,
-        level,
-        period: 'monthly' as BillingPeriod,
-        icon: level === 'base' ? '🌿' : '🏆',
-        title: level === 'base' ? 'Базовая на месяц' : 'Про на месяц',
-        subtitle: '30 дней доступа',
-        priceLabel: `${formatPrice(monthlyPrice)} / месяц`,
-        amount: monthlyPrice,
-        baseAmount: monthlyPrice,
-        savings: 0,
-        discountPercent: 0,
-        endsAt: monthlyEndsAt.toISOString(),
-        days: 30,
-        features: PAID_PLAN_FEATURES[level],
-      },
-      {
-        id: `${level}-seasonal`,
-        level,
-        period: 'seasonal' as BillingPeriod,
-        icon: level === 'base' ? '🍃' : '🌾',
-        title: level === 'base' ? 'Базовая на сезон' : 'Про на сезон',
-        subtitle: `До ${formatDateLabel(seasonEnd.toISOString())}`,
-        priceLabel: `${formatPrice(seasonAmount)} за сезон`,
-        amount: seasonAmount,
-        baseAmount: seasonBaseAmount,
-        savings: seasonBaseAmount - seasonAmount,
-        discountPercent: SEASON_DISCOUNT_PERCENT,
-        endsAt: seasonEnd.toISOString(),
-        days: seasonDays,
-        features: PAID_PLAN_FEATURES[level],
-      },
-    ]
+    return {
+      id: `${level}-monthly`,
+      kind: 'subscription',
+      level,
+      period: 'monthly' as BillingPeriod,
+      icon: level === 'base' ? '🌿' : '🏆',
+      title: level === 'base' ? 'Базовая на месяц' : 'Про на месяц',
+      subtitle: '30 дней доступа',
+      priceLabel: `${formatPrice(monthlyPrice)} / месяц`,
+      amount: monthlyPrice,
+      baseAmount: monthlyPrice,
+      savings: 0,
+      discountPercent: 0,
+      endsAt: monthlyEndsAt.toISOString(),
+      days: 30,
+      features: PAID_PLAN_FEATURES[level],
+    }
   })
+
+  const weeklyPlanEndsAt = addDays(now, WEEKLY_PLAN_ACCESS_DAYS)
+
+  return [
+    {
+      id: 'weekly-plan-7d',
+      kind: 'weekly_plan',
+      icon: '🗓️',
+      title: 'План на 7 дней',
+      subtitle: `Отдельный доступ на ${WEEKLY_PLAN_ACCESS_DAYS} дней`,
+      priceLabel: `${formatPrice(WEEKLY_PLAN_PRICE)} разово`,
+      amount: WEEKLY_PLAN_PRICE,
+      baseAmount: WEEKLY_PLAN_PRICE,
+      savings: 0,
+      discountPercent: 0,
+      endsAt: weeklyPlanEndsAt.toISOString(),
+      days: WEEKLY_PLAN_ACCESS_DAYS,
+      features: [
+        'Структурированный план по вашему огороду',
+        'Сегодня, ближайшие 3 дня и неделя',
+        'Учет дневника, погоды и объектов',
+        'Можно купить без подписки',
+      ],
+    },
+    ...subscriptionOffers,
+  ]
 }
 
-export function createSubscriptionFromOffer(offer: SubscriptionOffer, now = new Date()): SubscriptionInfo {
+export function createSubscriptionFromOffer(offer: CheckoutOffer, now = new Date()): SubscriptionInfo {
+  if (offer.kind !== 'subscription' || !offer.level || !offer.period) {
+    throw new Error('createSubscriptionFromOffer expects a subscription offer')
+  }
   return {
     level: offer.level,
     period: offer.period,
@@ -170,6 +161,13 @@ export function createSubscriptionFromOffer(offer: SubscriptionOffer, now = new 
     discountPercent: offer.discountPercent,
     source: 'manual',
   }
+}
+
+export function hasWeeklyPlannerAccess(data: OnboardingData, plan: Plan, now = new Date()): boolean {
+  if (plan === 'pro') return true
+  const accessUntil = data.weeklyPlanAccessUntil?.trim()
+  if (!accessUntil) return false
+  return new Date(accessUntil).getTime() > now.getTime()
 }
 
 export function isSubscriptionExpired(subscription: SubscriptionInfo | null | undefined, now = new Date()): boolean {
@@ -226,12 +224,20 @@ export function getSubscriptionNotice(subscription: SubscriptionInfo | null | un
 
 export const empty: OnboardingData = {
   city: '', 
+  displayName: '',
+  addressStyle: 'informal',
+  uiTextScale: 'normal',
+  helpHintsEnabled: true,
+  introSeen: true,
+  seenHints: [],
   terrain: '', 
   gardenObjects: [], 
   cropEntries: [],
   fertilizers: [],
   notificationEmail: '',
   vkContactUserId: 0,
+  telegramChatId: 0,
+  telegramUsername: '',
   referralCode: '',
   referralAppliedCode: '',
   referralInvitesAccepted: 0,
@@ -240,10 +246,19 @@ export const empty: OnboardingData = {
   lastPromoShareAt: null,
   experience: '', 
   tools: [], 
+  siteNotes: '',
+  rainObservations: [],
   timeZone: '',
   notifMorning: '06:00', 
   notifEvening: '19:00',
   notifLevel: 'standard', 
   notifChannels: ['vk'],
+  interestingFact: '',
+  interestingFactDateKey: null,
+  scienceFact: '',
+  scienceFactDateKey: null,
+  weeklyPlanAccessUntil: null,
+  weeklyPlanText: '',
+  weeklyPlanGeneratedAt: null,
   subscription: null,
 }
