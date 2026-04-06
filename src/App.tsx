@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import { addDiaryEntry, applyReferral, getEmailAuthState, loadDiary, loadLastNotification, loadSubscriptionNotif, loadUserData, requestAgronomistAnswer, saveUserData, sendEmailMagicLink, signOutEmailAuth, trackAnalyticsEvent, verifyReviewLogin, type EmailAuthState } from './supabase'
 import { detectEmbeddedBrowser, type EmbeddedBrowserInfo } from './utils/browser'
-import { CROPS, applyDiaryEntryToOnboardingData, buildSubscriptionOffers, empty, formatOperationMemorySummary, formatDateLabel, formatRainObservationSummary, getCropName, getDiaryEntryKindLabel, getEffectivePlan, getOperationLabel, getPrimaryOp, getSubscriptionNotice, getWeatherRisks, hasWeeklyPlannerAccess, isDiaryEntryCompletedOperation, parseDiaryText, rebuildOperationMemoryFromDiary, upsertRainObservation } from './utils/constants'
+import { CROPS, applyDiaryEntryToOnboardingData, buildSubscriptionOffers, empty, formatOperationMemorySummary, formatDateLabel, formatRainObservationSummary, getCropName, getDiaryEntryKindLabel, getEffectivePlan, getOperationLabel, getPrimaryOp, getSubscriptionNotice, getWeatherRisks, hasWeeklyPlannerAccess, isDiaryEntryCompletedOperation, isInTrial, parseDiaryText, rebuildOperationMemoryFromDiary, trialDaysLeft, upsertRainObservation } from './utils/constants'
 import { loadOfflineBundle, saveOfflineBundle, type OfflineBundle } from './utils/offline'
 import { trackMainView, trackVirtualPageView } from './utils/webAnalytics'
 import { clearReviewAuth, loadReviewAuth, REVIEW_USER_ID, saveReviewAuth, type ReviewAuthState } from './utils/reviewAuth'
@@ -590,6 +590,7 @@ export default function App() {
   const lastNotificationKeyRef = useRef('')
   const [nowMs, setNowMs] = useState(() => Date.now())
   const weeklyPlannerAccess = hasWeeklyPlannerAccess(gardenData, plan)
+  const effectivePlan: Plan = plan === 'pro' ? 'pro' : (isInTrial(gardenData) ? 'base' : plan)
   const shouldLoadWeather = screen === 'main' && tab === 'main' && online
   const liveWeather = useWeather(shouldLoadWeather ? gardenData.city : '')
   const shouldLoadWeeklyPlan = screen === 'main' && (tab === 'main' || tab === 'moon') && weeklyPlannerAccess && online
@@ -1628,6 +1629,12 @@ export default function App() {
         : d.notifChannels,
     }
 
+    if (!d.trialEndsAt) {
+      const trialEnd = new Date()
+      trialEnd.setDate(trialEnd.getDate() + 7)
+      nextOnboarding.trialEndsAt = trialEnd.toISOString()
+    }
+
     setGardenData(nextOnboarding)
     saveUserData(vkUserId, nextOnboarding, plan)
     void trackAnalyticsEvent({
@@ -1855,6 +1862,11 @@ export default function App() {
         </div>
         <AppLunarBadge />
       </div>
+      {effectivePlan === 'base' && isInTrial(gardenData) && trialDaysLeft(gardenData) > 0 && (
+        <div className="trial-banner" onClick={() => setTab('profile')}>
+          🎁 Пробный период: осталось {trialDaysLeft(gardenData)} {trialDaysLeft(gardenData) === 1 ? 'день' : trialDaysLeft(gardenData) < 5 ? 'дня' : 'дней'} · Базовая бесплатно
+        </div>
+      )}
       <div className="tab-scroll">
         {tab === 'main' && (
           <div className="tab-content">
@@ -2080,7 +2092,7 @@ export default function App() {
             {renderHelpHint('plants-overview')}
             <AppPlantsScreen
               data={gardenData}
-              plan={plan}
+              plan={effectivePlan}
               onUpdateEntry={updateEntry}
               onAddEntry={addEntry}
               onDeleteEntry={deleteEntry}
@@ -2091,6 +2103,7 @@ export default function App() {
               completingTodayTaskKey={completingTaskKey}
               onCompleteTodayTask={entry => void handleCompleteTodayTask(entry)}
               onDiaryEntryAdded={upsertRecentDiaryEntry}
+              onUpgrade={() => setTab('profile')}
             />
           </>
         )}
@@ -2111,7 +2124,7 @@ export default function App() {
           <>
             {renderHelpHint('moon-overview')}
             <AppMoonScreen
-              plan={plan}
+              plan={effectivePlan}
               city={gardenData.city}
               rainObservations={gardenData.rainObservations ?? []}
               weeklyPlannerAccess={weeklyPlannerAccess}

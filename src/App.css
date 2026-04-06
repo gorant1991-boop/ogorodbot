@@ -1720,3 +1720,14 @@ html {
 .ui-scale-large .chat-input button { width: 48px; font-size: 18px; }
 .ui-scale-large .msg { font-size: 15px; line-height: 1.65; }
 .ui-scale-large .nav-item { min-height: 52px; }
+
+.trial-banner {
+  background: linear-gradient(135deg, #2d7a3a, #4caf50);
+  color: #fff;
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.2px;
+}

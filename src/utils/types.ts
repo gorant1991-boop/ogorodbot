@@ -125,6 +125,7 @@ export interface OnboardingData {
   weeklyPlanAccessUntil?: string | null
   weeklyPlanText?: string
   weeklyPlanGeneratedAt?: string | null
+  trialEndsAt?: string | null
   subscription?: SubscriptionInfo | null
 }
 

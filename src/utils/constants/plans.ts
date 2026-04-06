@@ -222,6 +222,22 @@ export function getSubscriptionNotice(subscription: SubscriptionInfo | null | un
   return null
 }
 
+export function getTrialPlan(data: OnboardingData, now = new Date()): Plan {
+  if (!data.trialEndsAt) return 'free'
+  return new Date(data.trialEndsAt).getTime() > now.getTime() ? 'base' : 'free'
+}
+
+export function isInTrial(data: OnboardingData, now = new Date()): boolean {
+  if (!data.trialEndsAt) return false
+  return new Date(data.trialEndsAt).getTime() > now.getTime()
+}
+
+export function trialDaysLeft(data: OnboardingData, now = new Date()): number {
+  if (!data.trialEndsAt) return 0
+  const ms = new Date(data.trialEndsAt).getTime() - now.getTime()
+  return ms > 0 ? Math.ceil(ms / 86400000) : 0
+}
+
 export const empty: OnboardingData = {
   city: '', 
   displayName: '',

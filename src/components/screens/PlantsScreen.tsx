@@ -7,7 +7,7 @@ import { CompatScreen } from './CompatScreen'
 import { DiseaseScreen } from './DiseaseScreen'
 import { addDiaryEntry } from '../../supabase'
 
-export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEntry, vkUserId, onAskAi, onUpdateData, completedTodayTaskKeys = [], completingTodayTaskKey = '', onCompleteTodayTask, onDiaryEntryAdded }: {
+export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEntry, vkUserId, onAskAi, onUpdateData, completedTodayTaskKeys = [], completingTodayTaskKey = '', onCompleteTodayTask, onDiaryEntryAdded, onUpgrade }: {
   data: OnboardingData
   plan: Plan
   onUpdateEntry: (id: string, patch: Partial<CropEntry>) => void
@@ -20,6 +20,7 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
   completingTodayTaskKey?: string
   onCompleteTodayTask?: (entry: CropEntry) => void
   onDiaryEntryAdded?: (entry: DiaryEntry) => void
+  onUpgrade?: () => void
 }) {
   const [editEntry, setEditEntry] = useState<CropEntry | null>(null)
   const [showDiaryAdd, setShowDiaryAdd] = useState(false)
@@ -320,7 +321,7 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
                     ? `Бесплатно — ${cropLimit} культур. Перейдите на Базовую (15 культур)`
                     : `Базовая — ${cropLimit} культур. Перейдите на Про для неограниченного количества`}
                 </div>
-                <button className="btn-upgrade" onClick={() => setShowAddCrop(false)}>Посмотреть тарифы</button>
+                <button className="btn-upgrade" onClick={() => { setShowAddCrop(false); onUpgrade?.() }}>Перейти к тарифам →</button>
               </div>
             ) : (
               <>
@@ -630,8 +631,12 @@ export function PlantsScreen({ data, plan, onUpdateEntry, onAddEntry, onDeleteEn
               <button
                 key={o.id}
                 className="plants-no-objects-btn"
-                disabled={data.gardenObjects.length >= OBJECT_LIMITS[plan]}
+                disabled={false}
                 onClick={() => {
+                  if (data.gardenObjects.length >= OBJECT_LIMITS[plan]) {
+                    onUpgrade?.()
+                    return
+                  }
                   const count = data.gardenObjects.filter(x => x.type === o.id).length
                   onUpdateData({ gardenObjects: [...data.gardenObjects, makeObject(o.id, buildObjectName(o.id, count + 1))] })
                 }}
